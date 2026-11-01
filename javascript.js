@@ -1,6 +1,9 @@
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
-   Versi 4.4 — 1 November 2026 (UJI: API_URL diarahkan ke server uji virakhususgame@gmail.com)
+   Versi 4.5 — 1 November 2026
+   Baru di 4.5: menu Gambar promo (4:5) di profil penjual, per properti. Gambar dibuat
+   otomatis dari foto pertama, alamat area, LT/LB, dan harga. Watermark dipusatkan dan dikecilkan.
+   Versi 4.4 — 1 November 2026
    Baru di 4.4: area dipecah jadi Area + Kota dengan saran otomatis dari daftar wilayah
    baku (wilayah.json); pencocokan tiga tingkat (cocok, hampir cocok, alternatif di atas
    budget); watermark logo Gading Pro + nama agen di tengah foto properti saat disimpan
@@ -1385,6 +1388,205 @@ function gambarProp(pr, besar) {
 }
 
 /* ════════════════════════════════════════════════════════════
+   GAMBAR PROMO (4:5, 1080 x 1350)
+   Dibuat di HP dari foto pertama properti. Foto yang sudah ber-watermark
+   tidak diberi watermark lagi; watermark hanya dipasang bila tidak ada foto.
+   ════════════════════════════════════════════════════════════ */
+
+const PROMO_KALIMAT = ['Siap Huni', 'Rumah Terawat', 'Dijual Cepat'];
+
+/** "Rp 11 M", "Rp 1,25 M", "Rp 900 jt" untuk gambar promo. */
+function hargaPromo(n) {
+  const v = Number(n) || 0;
+  if (v >= 1e9) return 'Rp ' + (Math.round(v / 1e7) / 100).toString().replace('.', ',') + ' M';
+  return 'Rp ' + Math.round(v / 1e6) + ' jt';
+}
+
+function hargaPromoTeks(pr) {
+  if (pr.dijual && pr.harga_jual) return hargaPromo(pr.harga_jual);
+  if (pr.disewakan && pr.harga_sewa) return hargaPromo(pr.harga_sewa) + (pr.satuan_sewa === 'bulan' ? '/bln' : '/thn');
+  return '';
+}
+
+/** Nama area untuk judul besar: bagian sebelum koma (Bintaro, Jakarta Selatan -> BINTARO). */
+function areaPromo(pr) {
+  return (detailDariArea(pr.area) || kotaDariArea(pr.area) || 'Properti').toUpperCase();
+}
+
+function ukuranPromo(pr) {
+  return [pr.luas_tanah ? 'LT ' + angkaTampil(pr.luas_tanah) + ' m²' : '',
+    pr.luas_bangunan ? 'LB ' + angkaTampil(pr.luas_bangunan) + ' m²' : ''].filter(Boolean).join(' | ');
+}
+
+/** Menggambar satu gambar promo. Hasil: Blob JPEG. */
+async function buatGambarPromo(pr, kalimat) {
+  const W = 1080, H = 1350;
+  const kanvas = document.createElement('canvas');
+  kanvas.width = W;
+  kanvas.height = H;
+  const c = kanvas.getContext('2d');
+  c.fillStyle = '#B8AE97';
+  c.fillRect(0, 0, W, H);
+  let adaFoto = false;
+  const foto = fotoProperti(pr)[0];
+  if (foto) {
+    try {
+      const x = await ambilFotoBesar(foto.id_dokumen, 'bagikan');
+      const img = new Image();
+      img.src = x.url;
+      await img.decode();
+      const s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+      const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+      c.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      adaFoto = true;
+    } catch (e) { adaFoto = false; }
+  }
+  // Pita gelap di atas dan bawah supaya tulisan terbaca.
+  const atas = c.createLinearGradient(0, 0, 0, 430);
+  atas.addColorStop(0, 'rgba(0,0,0,0.55)');
+  atas.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = atas;
+  c.fillRect(0, 0, W, 430);
+  const bawah = c.createLinearGradient(0, H - 430, 0, H);
+  bawah.addColorStop(0, 'rgba(0,0,0,0)');
+  bawah.addColorStop(1, 'rgba(0,0,0,0.62)');
+  c.fillStyle = bawah;
+  c.fillRect(0, H - 430, W, 430);
+
+  const font = function (px, bobot) { return bobot + ' ' + px + 'px "Segoe UI", Roboto, Arial, sans-serif'; };
+  c.fillStyle = '#FFFFFF';
+  c.textAlign = 'center';
+  c.textBaseline = 'top';
+  c.font = font(44, 600);
+  if ('letterSpacing' in c) c.letterSpacing = '6px';
+  c.fillText((kalimat || '').toUpperCase(), W / 2, 110);
+  if ('letterSpacing' in c) c.letterSpacing = '0px';
+  const area = areaPromo(pr);
+  let fa = 150;
+  c.font = font(fa, 800);
+  while (c.measureText(area).width > W - 120 && fa > 48) { fa -= 6; c.font = font(fa, 800); }
+  c.fillText(area, W / 2, 180);
+
+  c.textBaseline = 'alphabetic';
+  const ukuran = ukuranPromo(pr);
+  if (ukuran) { c.font = font(48, 600); c.fillText(ukuran, W / 2, H - 250); }
+  const harga = hargaPromoTeks(pr);
+  if (harga) { c.font = font(132, 800); c.fillText(harga, W / 2, H - 110); }
+
+  if (!adaFoto) tempelMarka(c, W, H, await muatMarka());
+
+  const blob = await new Promise(function (ok, gagal) {
+    kanvas.toBlob(function (b) { if (b) ok(b); else gagal(new Error('toBlob')); }, 'image/jpeg', 0.92);
+  });
+  kanvas.width = 0;
+  kanvas.height = 0;
+  return blob;
+}
+
+/** Layar gambar promo: pilih kalimat pembuka, lihat pratinjau, lalu bagikan atau unduh. */
+function layarPromo(isi, p) {
+  const pr = p.id ? cariProperti(p.id) : null;
+  if (!pr) return tidakAda();
+  const k = cariKlien(pr.id_klien);
+  kepala({ judul: 'Gambar Promo' });
+  const st = S.layar;
+  let kalimat = PROMO_KALIMAT[0];
+  let mengetik = false;
+  let blobTerakhir = null;
+  let urlTerakhir = null;
+  const namaFile = 'Promo ' + (pr.nama_properti || 'properti').replace(/[^\w\- ]+/g, '').trim() + '.jpg';
+
+  const pratinjau = el('img', { class: 'pratinjau-promo', alt: 'Pratinjau gambar promo' });
+  const catatan = el('p', { class: 'kecil redup', 'aria-live': 'polite' });
+  const pilihan = el('div', { class: 'saran-area' });
+  const bidangSendiri = bidangTeks('fPromoKalimat', 'Kalimat sendiri', 'Ketik bebas', '',
+    { maxlength: '40', autocomplete: 'off', autocapitalize: 'characters', placeholder: 'Contoh: Lokasi Strategis' });
+  bidangSendiri.wadah.classList.add('tersembunyi');
+  const tombolBagi = tombol('tombol-wa', ikonWa('putih'), 'Bagikan ke WhatsApp', bagikan);
+  const tombolUnduh = tombol('tombol-kedua', 'unduh', 'Unduh gambar', unduh);
+
+  isi.append(pratinjau, catatan,
+    el('div', { class: 'bidang jarak-atas' }, el('span', { class: 'label', text: 'Kalimat pembuka' }), pilihan, bidangSendiri.wadah),
+    el('div', { class: 'tumpuk jarak-atas' }, tombolBagi, tombolUnduh));
+
+  function gambarPilihan() {
+    kosongkan(pilihan);
+    PROMO_KALIMAT.concat(['Ketik sendiri']).forEach(function (t) {
+      const aktif = t === 'Ketik sendiri' ? mengetik : (!mengetik && kalimat === t);
+      pilihan.append(el('button', { type: 'button', class: 'tombol-saran', 'aria-pressed': aktif ? 'true' : 'false', onclick: function () {
+        if (t === 'Ketik sendiri') {
+          mengetik = true;
+          bidangSendiri.wadah.classList.remove('tersembunyi');
+          bidangSendiri.isian.focus();
+        } else {
+          mengetik = false;
+          bidangSendiri.wadah.classList.add('tersembunyi');
+          kalimat = t;
+          segarkan();
+        }
+        gambarPilihan();
+      } }, t));
+    });
+  }
+  bidangSendiri.isian.addEventListener('change', function () {
+    const v = bidangSendiri.isian.value.trim();
+    kalimat = v ? rapiJudul_(v, false) : PROMO_KALIMAT[0];
+    segarkan();
+  });
+
+  let nomor = 0;
+  async function segarkan() {
+    const ke = ++nomor;
+    tombolBagi.disabled = true;
+    tombolUnduh.disabled = true;
+    catatan.textContent = 'Menyiapkan gambar...';
+    try {
+      const b = await buatGambarPromo(pr, kalimat);
+      if (ke !== nomor || S.layar !== st) return;
+      if (urlTerakhir) URL.revokeObjectURL(urlTerakhir);
+      blobTerakhir = b;
+      urlTerakhir = URL.createObjectURL(b);
+      pratinjau.src = urlTerakhir;
+      catatan.textContent = 'Ukuran 4:5, siap dibagikan ke WhatsApp.';
+    } catch (e) {
+      if (ke === nomor) catatan.textContent = 'Gambar belum bisa dibuat. Coba lagi.';
+    } finally {
+      if (ke === nomor) { tombolBagi.disabled = false; tombolUnduh.disabled = false; }
+    }
+  }
+
+  function sibuk(t, aktif, teksSibuk, teksBiasa) {
+    t.disabled = aktif;
+    t.querySelector('span').textContent = aktif ? teksSibuk : teksBiasa;
+  }
+
+  function unduh() {
+    if (!urlTerakhir) return;
+    const a = el('a', { href: urlTerakhir, download: namaFile });
+    document.body.append(a);
+    a.click();
+    a.remove();
+  }
+
+  async function bagikan() {
+    if (!blobTerakhir) return;
+    const file = new File([blobTerakhir], namaFile, { type: 'image/jpeg' });
+    if (!(navigator.canShare && navigator.canShare({ files: [file] }))) { unduh(); return; }
+    sibuk(tombolBagi, true, 'Membuka menu...', 'Bagikan ke WhatsApp');
+    try {
+      await navigator.share({ files: [file], text: teksPromosi([pr], k) });
+    } catch (e) {
+      if (!e || e.name !== 'AbortError') unduh();
+    } finally {
+      sibuk(tombolBagi, false, '', 'Bagikan ke WhatsApp');
+    }
+  }
+
+  gambarPilihan();
+  segarkan();
+}
+
+/* ════════════════════════════════════════════════════════════
    NAVIGASI
    Tombol kembali di layar dan tombol kembali HP memakai riwayat yang sama.
    Alamat hanya berisi nama layar; tiket dan data tidak pernah masuk alamat.
@@ -1405,6 +1607,7 @@ const LAYAR = {
   formProperti: layarFormProperti,
   cetak: layarCetak,
   bagikan: layarBagikan,
+  promo: layarPromo,
   dihapus: layarDihapus,
   rapikanArea: layarRapikanArea,
   tanpaInternet: layarTanpaInternet
@@ -2356,7 +2559,10 @@ function layarProfil(isi, p) {
         const tampilProps = props.filter(function (pr) { return sub === 'semua' || (sub === 'dipasarkan' ? dipasarkan(pr) : denganPembeli(pr)); });
         panel.append(tampilProps.length
           ? el('div', { class: 'daftar jarak-atas-kecil' }, tampilProps.map(function (pr) {
-              return barisProperti(pr, function () { buka('properti', { id: pr.id_properti }); }, false);
+              const baris = barisProperti(pr, function () { buka('properti', { id: pr.id_properti }); }, false);
+              if (k.peran !== 'Penjual') return baris;
+              return el('div', { class: 'grup-prop' }, baris,
+                tombol('tombol-kedua tombol-kecil', 'gambar', 'Gambar promo', function () { buka('promo', { id: pr.id_properti }); }));
             }))
           : el('p', { class: 'redup jarak-atas-kecil', text: sub === 'dipasarkan' ? 'Tidak ada properti yang sedang dipasarkan.' : 'Belum ada properti yang deal atau sold.' }));
       } else {
@@ -2723,6 +2929,38 @@ function layarFoto(isi, p) {
 }
 
 /* ── Watermark foto properti: logo Gading Pro + nama agen, di tengah, samar tapi terbaca ── */
+/** Logo Gading Pro + nama agen di tengah gambar (W x H). Dipakai foto properti dan gambar promo. */
+function tempelMarka(c, W, H, logo) {
+    const rasio = logo.height / logo.width;
+    const lw = Math.min(W * 0.3, H * 0.4 / rasio);
+    const lh = lw * rasio;
+    const fs = Math.round(lw * 0.18);
+    const gap = fs * 0.18;
+    const total = lh + gap + fs;
+    const x = (W - lw) / 2;
+    const y = (H - total) / 2;
+    // Logo: lingkar putih tipis di sekelilingnya supaya huruf hitamnya tetap terbaca di foto gelap.
+    c.save();
+    c.globalAlpha = 0.42;
+    c.shadowColor = 'rgba(255,255,255,1)';
+    c.shadowBlur = lw * 0.05;
+    c.drawImage(logo, x, y, lw, lh);
+    c.restore();
+    // Nama agen
+    c.save();
+    c.globalAlpha = 0.55;
+    c.font = '700 ' + fs + 'px "Segoe UI", Roboto, Arial, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'top';
+    c.lineJoin = 'round';
+    c.lineWidth = fs * 0.08;
+    c.strokeStyle = 'rgba(0,0,0,0.4)';
+    c.fillStyle = '#ffffff';
+    c.strokeText(CONFIG.MARKA_TEKS, W / 2, y + lh + gap);
+    c.fillText(CONFIG.MARKA_TEKS, W / 2, y + lh + gap);
+    c.restore();
+}
+
 const MARKA = { janji: null };
 function muatMarka() {
   if (!MARKA.janji) {
@@ -2752,34 +2990,7 @@ async function beriMarka(base64) {
     kanvas.height = H;
     const c = kanvas.getContext('2d');
     c.drawImage(gbr, 0, 0, W, H);
-    const rasio = logo.height / logo.width;
-    const lw = Math.min(W * 0.4, H * 0.5 / rasio);
-    const lh = lw * rasio;
-    const fs = Math.round(lw * 0.24);
-    const gap = fs * 0.18;
-    const total = lh + gap + fs;
-    const x = (W - lw) / 2;
-    const y = (H - total) / 2;
-    // Logo: lingkar putih tipis di sekelilingnya supaya huruf hitamnya tetap terbaca di foto gelap.
-    c.save();
-    c.globalAlpha = 0.42;
-    c.shadowColor = 'rgba(255,255,255,1)';
-    c.shadowBlur = lw * 0.05;
-    c.drawImage(logo, x, y, lw, lh);
-    c.restore();
-    // Nama agen
-    c.save();
-    c.globalAlpha = 0.55;
-    c.font = '700 ' + fs + 'px "Segoe UI", Roboto, Arial, sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'top';
-    c.lineJoin = 'round';
-    c.lineWidth = fs * 0.08;
-    c.strokeStyle = 'rgba(0,0,0,0.4)';
-    c.fillStyle = '#ffffff';
-    c.strokeText(CONFIG.MARKA_TEKS, W / 2, y + lh + gap);
-    c.fillText(CONFIG.MARKA_TEKS, W / 2, y + lh + gap);
-    c.restore();
+    tempelMarka(c, W, H, logo);
     const hasil = await new Promise(function (ok, gagal) {
       kanvas.toBlob(function (b) { if (b) ok(b); else gagal(new Error('toBlob')); }, 'image/jpeg', CONFIG.FOTO_KUALITAS);
     });
