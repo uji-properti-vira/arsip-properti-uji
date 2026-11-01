@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Pengaman (CSP): hanya mengizinkan file aplikasi ini, login Google, API Apps Script, dan font. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-src https://accounts.google.com/gsi/; connect-src 'self' https://accounts.google.com/gsi/ https://script.google.com https://script.googleusercontent.com; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#F6F5EF">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Arsip Properti</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap">
+  <link rel="stylesheet" href="./stylesheet.css">
+  <script src="./javascript.js" defer></script>
+</head>
+<body>
+  <aside class="sisi" id="sisi" aria-label="Menu samping"></aside>
+
+  <header class="kepala tanpa-kembali" id="kepala">
+    <button type="button" class="tombol-ikon tersembunyi" id="tombolKembali" aria-label="Kembali">
+      <svg class="ikon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg>
+    </button>
+    <h1 class="kepala-judul" id="kepalaJudul">Arsip Properti</h1>
+    <div class="kepala-kanan" id="kepalaKanan"></div>
+  </header>
+
+  <main class="isi" id="isi" tabindex="-1">
+    <div class="kosong">
+      <div class="pemutar" aria-hidden="true"></div>
+      <p class="tebal">Sebentar ya...</p>
+    </div>
+  </main>
+
+  <nav class="navbawah tersembunyi" id="navBawah" aria-label="Menu utama"></nav>
+
+  <div class="hanya-pembaca-layar" id="pengumuman" aria-live="polite"></div>
+
+  <noscript>
+    <p class="isi">Aplikasi ini butuh JavaScript. Buka lewat Chrome di HP.</p>
+  </noscript>
+</body>
+</html>
