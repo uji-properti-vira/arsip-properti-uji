@@ -1,5 +1,9 @@
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
+   Versi 4.6 — 1 November 2026. Baru di 4.6: KTP, NPWP, dan Sertifikat disimpan dua versi
+   (ber-watermark untuk dilihat dan dibagikan, asli tanpa watermark untuk arsip). Unduh versi asli
+   hanya setelah konfirmasi dan dicatat. Ubah jenis foto lama ke KTP/NPWP/Sertifikat juga dibuatkan
+   dua versi. Butuh Code.gs 2.4.
    Versi 4.5 — 1 November 2026
    Baru di 4.5: menu Gambar promo (4:5) di profil penjual, per properti. Gambar dibuat
    otomatis dari foto pertama, alamat area, LT/LB, dan harga. Watermark dipusatkan dan dikecilkan.
@@ -83,6 +87,8 @@ const JENIS_DOK = ['KTP', 'NPWP', 'PBB', 'Sertifikat', 'Foto properti', 'Lainnya
 const DOK_KLIEN = ['KTP', 'NPWP'];
 const DOK_PROPERTI = ['PBB', 'Sertifikat', 'Foto properti'];
 const DOK_BOLEH_DIBAGIKAN = ['PBB', 'Sertifikat'];   // hanya dengan persetujuan penjual; KTP dan NPWP tidak pernah
+// Disimpan dua versi: ber-watermark (untuk dilihat, dibagikan, PDF) dan asli tanpa watermark (arsip, unduh terbatas).
+const DOK_DUA_VERSI = ['KTP', 'NPWP', 'Sertifikat'];
 const JENIS_PROP = ['Rumah', 'Tanah', 'Ruko', 'Lainnya'];
 const KONDISI = ['Baru', 'Second'];
 const SERTIFIKAT = ['SHM', 'HGB', 'AJB', 'Girik', 'Lainnya'];
@@ -3251,7 +3257,8 @@ function layarSimpanFoto(isi, p) {
       it.terkunci = true;
       tandai(it);
       let gambarKirim = it.base64;
-      if (it.jenis === 'Foto properti') {
+      const duaVersi = DOK_DUA_VERSI.indexOf(it.jenis) >= 0;
+      if (it.jenis === 'Foto properti' || duaVersi) {
         try { gambarKirim = await beriMarka(it.base64); } catch (e0) {
           // Lebih baik berhenti daripada mengirim foto properti tanpa watermark.
           it.terkunci = false;
@@ -3264,7 +3271,8 @@ function layarSimpanFoto(isi, p) {
         const jw = await panggil('unggahDokumen', {
           id_unggahan: it.idUnggahan, id_klien: f.id_klien,
           id_properti: DOK_KLIEN.indexOf(it.jenis) >= 0 ? '' : f.tujuan,
-          jenis: it.jenis, judul: it.jenis === 'Lainnya' ? it.judul : '', gambar: gambarKirim
+          jenis: it.jenis, judul: it.jenis === 'Lainnya' ? it.judul : '', gambar: gambarKirim,
+          gambar_asli: duaVersi ? it.base64 : ''
         }, { batas: CONFIG.BATAS_WAKTU_UNGGAH_MS });
         if (jw.ok) { berhasilSatu(it, jw.data.dokumen); dikirim++; continue; }
         // Server menolak dengan jelas: foto ini belum tersimpan, boleh diubah dan dicoba lagi.
@@ -3394,18 +3402,48 @@ function layarLihatDokumen(isi, p) {
   });
   const sebelumnya = tombol('tombol-kedua', 'kiri', 'Sebelumnya', function () { if (i > 0) { i--; tampilFoto(); } });
   const berikutnya = tombol('tombol-kedua', 'kanan', 'Berikutnya', function () { if (i < daftar.length - 1) { i++; tampilFoto(); } });
+  const tombolAsli = tombol('tombol-kedua', 'unduh', 'Unduh versi asli', unduhAsli);
 
   isi.append(wb, info, bingkai,
     el('div', { class: 'tumpuk jarak-atas' }, tombolBesar,
       daftar.length > 1 ? el('div', { class: 'baris-2' }, sebelumnya, berikutnya) : null),
     el('div', { class: 'tumpuk jarak-atas' },
+      tombolAsli,
       tombol('tombol-utama', 'kamera', 'Foto ulang', function () { buka('foto', tujuanFoto); }),
       tombol('', 'pindah', 'Ubah jenis atau pindahkan', function () { buka('ubahDok', { id_dokumen: daftar[i].id_dokumen }); }),
       tombol('tombol-bahaya', 'sampah', 'Hapus foto ini', hapusFoto)),
     el('p', { class: 'kecil redup jarak-atas-kecil', text: 'Foto ulang menambah foto baru. Foto lama tetap ada sampai dihapus.' }));
 
+  /** Unduh foto asli (tanpa watermark). Hanya setelah konfirmasi; server mencatat setiap unduhan. */
+  async function unduhAsli() {
+    const d = daftar[i];
+    const yakin = await konfirmasi('Unduh foto asli?',
+      'Ini foto asli tanpa watermark. Hanya untuk arsip Anda, jangan dibagikan ke siapa pun. Setiap unduhan dicatat.',
+      'Ya, unduh');
+    if (!yakin) return;
+    tombolAsli.disabled = true;
+    kosongkan(tombolAsli);
+    tombolAsli.append(el('span', { text: 'Menyiapkan...' }));
+    try {
+      const j = await panggil('ambilFoto', { id_dokumen: d.id_dokumen, versi: 'asli', konfirmasi: true });
+      if (!j.ok) throw new Error(j.pesan || 'Foto asli tidak bisa dibuka.');
+      const url = URL.createObjectURL(base64KeBlob(j.data.gambar, j.data.mime || 'image/jpeg'));
+      unduhBlob(url, (d.nama_file || d.jenis).replace(/\.jpg$/, '') + ' - ASLI.jpg');
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      tampilBanner(wb, { jenis: 'sukses', judul: 'Foto asli diunduh', pesan: 'Cek folder unduhan di HP atau laptop Anda.' });
+    } catch (e) {
+      if (e instanceof GalatSesi) return;
+      tampilBanner(wb, { jenis: 'gagal', judul: 'Foto asli belum bisa diunduh', pesan: e.message || 'Coba lagi sebentar lagi.' });
+    } finally {
+      tombolAsli.disabled = false;
+      kosongkan(tombolAsli);
+      tombolAsli.append(ikon('unduh'), el('span', { text: 'Unduh versi asli' }));
+    }
+  }
+
   async function tampilFoto() {
     const d = daftar[i];
+    tombolAsli.classList.toggle('tersembunyi', !(d.ada_asli && DOK_DUA_VERSI.indexOf(d.jenis) >= 0));
     info.textContent = 'Foto ' + (i + 1) + ' dari ' + daftar.length + ' · ' + formatTanggal(d.dibuat_pada, true);
     sebelumnya.disabled = i === 0;
     berikutnya.disabled = i === daftar.length - 1;
@@ -3509,10 +3547,22 @@ function layarUbahDokumen(isi, p) {
       selTempat.focus();
       return;
     }
+    // Foto lama yang belum punya versi asli dan diubah jadi KTP/NPWP/Sertifikat: kirim versi ber-watermark-nya.
+    let gambarBaru = '';
+    if (DOK_DUA_VERSI.indexOf(jenis) >= 0 && !d.ada_asli) {
+      try {
+        const foto = await ambilFotoBesar(d.id_dokumen);
+        gambarBaru = await beriMarka(await blobKeBase64(foto.blob));
+      } catch (e0) {
+        if (e0 instanceof GalatSesi) return;
+        tampilBanner(wb, { jenis: 'gagal', judul: 'Foto belum bisa disiapkan', pesan: 'Coba tekan Simpan lagi.' });
+        return;
+      }
+    }
     tombolSimpanSibuk(tombolSimpan, true);
     S.sibuk = true;
     try {
-      const j = await panggil('ubahDokumen', { id_dokumen: d.id_dokumen, jenis: jenis, judul: nilaiJudul, id_properti: DOK_KLIEN.indexOf(jenis) >= 0 ? '' : selTempat.value });
+      const j = await panggil('ubahDokumen', { id_dokumen: d.id_dokumen, jenis: jenis, judul: nilaiJudul, id_properti: DOK_KLIEN.indexOf(jenis) >= 0 ? '' : selTempat.value, gambar: gambarBaru });
       S.sibuk = false;
       if (j.ok) {
         simpanKeDaftar(S.data.dokumen, 'id_dokumen', j.data.dokumen);
