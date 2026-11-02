@@ -1,6 +1,8 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
+   Versi 4.7 — 2 November 2026. Urusan hampers dihapus dari tampilan. Angka di Beranda dan tab Segera
+   kini sama: ulang tahun hari ini sampai H-3 yang belum diucapkan. Code.gs tidak berubah (tetap 2.4).
    Versi 4.5 revisi lengkap — 2 November 2026. Butuh Code.gs 2.4. Baru: fasilitas properti (ukuran tanah,
    carport, listrik, air, menghadap), harga promo dan BU, filter Diskon dan BU, ulang tahun klien di Beranda,
    gambar promo untuk banyak foto, dan pengingat pembeli yang sudah dapat tidak diingatkan lagi.
@@ -2202,16 +2204,15 @@ function ultahDaftar(maks) {
 }
 
 function sudahUcap(k, u) { return Number(k.ultah_diucapkan) === u.tahun; }
-function hampersSudah(k, u) { return Number(k.hampers_tahun) === u.tahun; }
 
-/** Perlu tindakan: hari ini belum diucapkan, atau H-3 sampai hari ini hampers belum dikirim. */
-function ultahPerlu(k, u) {
-  return (u.selisih === 0 && !sudahUcap(k, u)) || (u.selisih <= 3 && !hampersSudah(k, u));
+/** Ulang tahun hari ini sampai H-3 yang belum diucapkan. Dipakai angka Beranda dan tab Segera, supaya selalu sama. */
+function ultahSegera() {
+  return ultahDaftar(3).filter(function (x) { return !sudahUcap(x.k, x.u); });
 }
 
-/** Angka pada tombol Beranda: klien ulang tahun yang masih perlu tindakan. */
+/** Angka pada tombol Beranda: ulang tahun dalam 3 hari ke depan yang belum diucapkan. */
 function jumlahUltahPerlu() {
-  return ultahDaftar(3).filter(function (x) { return ultahPerlu(x.k, x.u); }).length;
+  return ultahSegera().length;
 }
 
 function ultahHariTeks(selisih) { return selisih === 0 ? 'hari ini' : selisih === 1 ? 'besok' : selisih + ' hari lagi'; }
@@ -2229,7 +2230,7 @@ function teksUcapan(k) {
   return 'Selamat ulang tahun, ' + namaSapaan(k.nama) + '. Semoga sehat, bahagia, dan lancar rezekinya. Salam hangat, ' + CONFIG.NAMA_PEMILIK + ' – Gading Pro.';
 }
 
-/** Simpan tanda ucapan atau hampers ke server, lalu muat ulang Beranda. */
+/** Simpan tanda ucapan ke server, lalu muat ulang Beranda. */
 async function aturUltah(k, data, judulGagal, judulSukses) {
   tampilMemuat('Menyimpan...');
   try {
@@ -2263,9 +2264,6 @@ function kartuUltah() {
       if (!sudahUcap(k, u)) aksi.push(tombol('tombol-kecil tombol-kedua', 'centang', 'Sudah', function () {
         aturUltah(k, { ultah_diucapkan: String(u.tahun) }, 'Ucapan belum tercatat', 'Ucapan dicatat');
       }));
-      if (!hampersSudah(k, u)) aksi.push(tombol('tombol-kecil', 'bagikan', 'Hampers dikirim', function () {
-        aturUltah(k, { hampers_tahun: String(u.tahun) }, 'Hampers belum tercatat', 'Hampers dicatat');
-      }));
     }
     return el('div', { class: 'baris-ultah' },
       el('button', { type: 'button', class: 'baris', onclick: function () { buka('profil', { id: k.id_klien }); } },
@@ -2273,15 +2271,14 @@ function kartuUltah() {
         el('span', { class: 'tengah' },
           el('span', { class: 'judul', text: k.nama }),
           el('span', { class: 'sub', text: ultahTanggalTeks(u) + (u.umur ? ' · ke-' + u.umur : '') + ' · ' + ultahHariTeks(u.selisih) }),
-          segeraTab ? el('span', { class: 'sub tebal ' + (hampersSudah(k, u) ? 'teks-hijau' : 'teks-aksen'),
-            text: hampersSudah(k, u) ? 'Hampers sudah dikirim' : (u.selisih === 0 ? 'Siapkan hampers' : 'H-' + u.selisih + ' · siapkan hampers') }) : null)),
+          segeraTab && sudahUcap(k, u) ? el('span', { class: 'sub tebal teks-hijau', text: 'Ucapan sudah dicatat' }) : null)),
       aksi.length ? el('div', { class: 'baris-ingat-aksi' }, aksi) : null);
   }
 
   function gambar() {
     kosongkan(wadah);
     const tab = S.ultahTab === 'bulan' ? 'bulan' : 'segera';
-    const segera = semua.filter(function (x) { return x.u.selisih <= 3 && !sudahUcap(x.k, x.u); });
+    const segera = ultahSegera();
     wadah.append(
       el('div', { class: 'kartu-judul' }, el('h2', {}, ikon('kalender'), 'Ulang tahun')),
       segmen([{ kode: 'segera', label: 'Segera', lencana: segera.length }, { kode: 'bulan', label: '30 hari ke depan' }], tab,
@@ -2289,7 +2286,7 @@ function kartuUltah() {
     if (tab === 'segera') {
       wadah.append(segera.length
         ? el('div', { class: 'daftar daftar-ingat' }, segera.map(function (x) { return baris(x, true); }))
-        : el('p', { class: 'kecil redup jarak-atas-kecil', text: 'Tidak ada ulang tahun dalam 3 hari ke depan yang belum diurus.' }));
+        : el('p', { class: 'kecil redup jarak-atas-kecil', text: 'Tidak ada ulang tahun dalam 3 hari ke depan yang belum diucapkan.' }));
     } else {
       wadah.append(el('div', { class: 'daftar daftar-ingat' }, semua.map(function (x) { return baris(x, x.u.selisih <= 3); })));
     }
