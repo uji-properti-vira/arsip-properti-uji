@@ -85,6 +85,8 @@ p { margin: 0 0 10px; }
 .baris-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .baris-2 > .tombol { padding-left: 10px; padding-right: 10px; gap: 8px; }
 .baris-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+/* Pilihan "Diisi sebagai" harga promo: di layar HP ditumpuk supaya tidak keluar layar. */
+@media (max-width: 480px) { .kotak-promo .baris-3 { grid-template-columns: 1fr; } }
 
 /* ── Kepala halaman ───────────────────────────────────────── */
 
@@ -274,6 +276,7 @@ a.tombol { text-decoration: none; }
 .chip-Penjual { background: var(--jual-latar); color: var(--jual-teks); }
 .chip-Pembeli { background: var(--beli-latar); color: var(--beli-teks); }
 .baris-chip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.baris-chip .chip { max-width: 100%; white-space: normal; }   /* label panjang turun baris, tidak terpotong */
 
 /* ── Banner (tetap di layar, tidak hilang sendiri) ────────── */
 
@@ -907,7 +910,7 @@ body.layar-masuk .isi { max-width: none; padding: 0; }
 .baris-ingat { border-top: 1px solid var(--garis); padding-bottom: 10px; }
 .baris-ingat:first-child { border-top: 0; }
 .baris-ingat .baris { border-top: 0; }
-.baris-ingat-aksi { display: flex; gap: 10px; justify-content: flex-end; padding: 0 12px; }
+.baris-ingat-aksi { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; padding: 0 12px; }
 
 /* Detail klien: pengingat dan pencocokan */
 .baris-pengingat {

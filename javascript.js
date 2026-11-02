@@ -1592,6 +1592,11 @@ async function buatGambarPromo(pr, idFoto, pilih) {
   c.textAlign = 'center';
   c.textBaseline = 'alphabetic';
   c.fillStyle = '#FFFFFF';
+  // Bayangan halus di belakang tulisan bawah supaya tetap terbaca di foto yang terang.
+  c.save();
+  c.shadowColor = 'rgba(0,0,0,0.85)';
+  c.shadowBlur = 14;
+  c.shadowOffsetY = 2;
   const y0 = H - 600;
   tulisanMuat(c, pr.nama_properti || 'Properti', 66, '800', W - 120);
   c.fillText(pr.nama_properti || 'Properti', W / 2, y0);
@@ -1628,6 +1633,7 @@ async function buatGambarPromo(pr, idFoto, pilih) {
     tulisanMuat(c, 'Hubungi ' + CONFIG.NAMA_PEMILIK + ' · ' + CONFIG.NO_HP_PEMILIK, 42, '700', W - 120);
     c.fillText('Hubungi ' + CONFIG.NAMA_PEMILIK + ' · ' + CONFIG.NO_HP_PEMILIK, W / 2, H - 70);
   }
+  c.restore();
 
   const blob = await new Promise(function (ok, gagal) {
     kanvas.toBlob(function (b) { if (b) ok(b); else gagal(new Error('toBlob')); }, 'image/jpeg', 0.92);
@@ -4357,6 +4363,9 @@ function blokPromo(kode, judulTanda, ambilNormal, awalPromo) {
   hargaF.isian.addEventListener('input', function () { segarkan(); });
   rpF.isian.addEventListener('input', function () { segarkan(); });
   pctF.isian.addEventListener('input', function () { segarkan(); });
+  // Tampilan awal sesuai pilihan bawaan ("Harga promo"): isian potongan disembunyikan dulu.
+  rpF.wadah.classList.add('tersembunyi');
+  pctF.wadah.classList.add('tersembunyi');
 
   function aturCara() {
     hargaF.wadah.classList.toggle('tersembunyi', cara !== 'harga');
