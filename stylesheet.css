@@ -1043,3 +1043,34 @@ body.layar-masuk .isi { max-width: none; padding: 0; }
 .tombol-saran[aria-pressed='true'] { background: var(--utama); color: #FFFFFF; border-color: var(--utama); }
 .grup-prop { display: flex; flex-direction: column; gap: 6px; }
 .grup-prop .tombol-kecil { align-self: flex-end; }
+
+/* ── v4.5: harga coret, hemat, label BU dan DISKON ─────────── */
+.harga-promo { margin: 10px 0 2px; }
+.harga-promo .harga-coret { display: block; font-size: 17px; font-weight: 600; color: var(--redup); text-decoration: line-through; }
+.harga-promo .harga-besar { display: block; margin: 0; }
+.harga-promo .hemat { display: block; font-size: 15px; font-weight: 700; color: #2E7D5B; margin-top: 2px; }
+.baris .harga-coret-kecil { display: block; font-size: 13px; font-weight: 600; color: var(--redup); text-decoration: line-through; }
+.label-tumpuk { position: absolute; top: 6px; right: 6px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; pointer-events: none; }
+.gambar-utama .label-tumpuk { top: 12px; right: 12px; gap: 6px; }
+.label-foto { padding: 2px 7px; border-radius: 6px; font-size: 12px; font-weight: 800; letter-spacing: 1px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
+.gambar-utama .label-foto { font-size: 16px; padding: 4px 12px; }
+.label-bu { background: #2E7D5B; color: #fff; }
+.label-diskon { background: #F2B33D; color: #3A2400; }
+
+.baris-ultah { border-top: 1px solid var(--garis); padding-bottom: 10px; }
+.baris-ultah:first-child { border-top: 0; }
+.baris-ultah .baris { border-top: 0; }
+
+/* ── v4.5: gambar promo, pilih foto ─────────────────────── */
+.grid-foto-promo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 4px; }
+.pilih-foto { position: relative; aspect-ratio: 4 / 5; border-radius: 12px; overflow: hidden; padding: 0; border: 2px solid transparent; background: #E9DFCC; cursor: pointer; }
+.pilih-foto img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.55; transition: opacity 0.15s; }
+.pilih-foto[aria-pressed='true'] { border-color: #2E7D5B; }
+.pilih-foto[aria-pressed='true'] img { opacity: 1; }
+.tanda-pilih { position: absolute; right: 6px; top: 6px; width: 26px; height: 26px; border-radius: 50%; background: #fff; color: #2E7D5B; display: none; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
+.pilih-foto[aria-pressed='true'] .tanda-pilih { display: flex; }
+.hasil-promo { display: flex; gap: 10px; overflow-x: auto; margin: 10px 0; }
+.hasil-promo .pratinjau-promo { width: 180px; flex: 0 0 auto; aspect-ratio: 4 / 5; height: auto; border-radius: 10px; box-shadow: var(--bayang); }
+
+/* ── Versi uji: pita di bagian atas (hanya di paket UJI) ───── */
+.pita-uji { position: relative; z-index: 30; background: #F28C28; color: #fff; text-align: center; font-size: 13px; font-weight: 800; letter-spacing: 0.5px; padding: 5px 8px; }
