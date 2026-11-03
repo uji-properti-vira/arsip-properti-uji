@@ -2868,6 +2868,7 @@ function layarProfil(isi, p) {
 
   // Properti yang cocok untuk pembeli
   if (pembeli) isi.append(kartuCocokPembeli(k));
+  if (pembeli) { const kl = kartuListingCocok(k); if (kl) isi.append(kl); }
 
   isi.append(el('div', { class: 'aksi-tiga' },
     el('button', { type: 'button', class: 'aksi-kecil', onclick: function () {
@@ -4832,6 +4833,31 @@ function labelDesakListing(l) {
   if (/\b(dijual|jual) rugi\b|banting harga|turun harga|price drop/.test(t)) return 'Dijual rugi';
   if (/\b(dijual|disewakan|dikontrakkan) cepat\b|butuh cepat|urgent/.test(t)) return /sewa|kontrak/.test(t) && !/\bdijual\b/.test(t) ? 'Disewakan cepat' : 'Dijual cepat';
   return '';
+}
+
+/** Satu pembeli: listing agen lain (stok) yang cocok. Aturannya sama dengan pembeliUntukListing. */
+function kartuListingCocok(k) {
+  if ((k.status_beli || 'Mencari') !== 'Mencari' || !punyaKebutuhan(k)) return null;
+  const hasil = [];
+  (S.data.listing || []).forEach(function (l) {
+    if (l.tipe !== 'stok' || listingSelesai(l)) return;
+    const sewa = l.tawar === 'sewa';
+    if ((k.kebutuhan_cara === 'Beli' && sewa) || (k.kebutuhan_cara === 'Sewa' && !sewa)) return;
+    if (k.kebutuhan_jenis && (!l.jenis || jenisDasar(k.kebutuhan_jenis) !== jenisDasar(l.jenis))) return;
+    if (k.kebutuhan_area && !kotaCocokTeks(k.kebutuhan_area, [l.nama, l.lokasi, l.catatan].join(' '))) return;
+    if (k.budget && l.harga) {
+      const h = sewa && /per bulan/.test(l.catatan || '') ? Number(l.harga) * 12 : Number(l.harga);
+      if (h > Number(k.budget)) return;
+    }
+    hasil.push(l);
+  });
+  if (!hasil.length) return null;
+  const kotak = el('section', { class: 'kartu kartu-hijau kartu-cocok jarak-atas-kecil', 'aria-label': 'Listing yang cocok' });
+  kotak.append(el('h2', { class: 'judul-kartu' }, ikon('cocok'), hasil.length + ' listing agen cocok'),
+    el('p', { class: 'kecil redup', text: 'Dari menu Listing (stok agen lain). Ketuk untuk membuka.' }),
+    el('div', { class: 'daftar' }, hasil.slice(0, 5).map(kartuListing)),
+    hasil.length > 5 ? el('p', { class: 'kecil redup', text: 'Menampilkan 5 dari ' + hasil.length + '. Sisanya ada di menu Listing.' }) : null);
+  return kotak;
 }
 
 function kartuListing(l) {
