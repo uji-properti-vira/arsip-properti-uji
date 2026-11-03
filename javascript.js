@@ -4855,8 +4855,8 @@ function kartuListingCocok(k) {
   const kotak = el('section', { class: 'kartu kartu-hijau kartu-cocok jarak-atas-kecil', 'aria-label': 'Listing yang cocok' });
   kotak.append(el('h2', { class: 'judul-kartu' }, ikon('cocok'), hasil.length + ' listing agen cocok'),
     el('p', { class: 'kecil redup', text: 'Dari menu Listing (stok agen lain). Ketuk untuk membuka.' }),
-    el('div', { class: 'daftar' }, hasil.slice(0, 5).map(kartuListing)),
-    hasil.length > 5 ? el('p', { class: 'kecil redup', text: 'Menampilkan 5 dari ' + hasil.length + '. Sisanya ada di menu Listing.' }) : null);
+    el('div', { class: 'daftar' }, hasil.slice(0, 5).map(kartuListing)));
+  if (hasil.length > 5) kotak.append(el('p', { class: 'kecil redup', text: 'Menampilkan 5 dari ' + hasil.length + '. Sisanya ada di menu Listing.' }));
   return kotak;
 }
 
