@@ -4176,7 +4176,7 @@ function tombolSimpanSibuk(t, sibuk) {
 
 const LISTING_STATUS = ['Baru', 'Sudah dihubungi', 'Ada pembeli', 'Deal', 'Batal'];
 const LISTING_SELESAI = ['Deal', 'Batal'];
-const LS_KANTOR = /\b(gading ?pro|ray ?white|era ?house|era\b|century ?21|c21|re\/?max|remax|pinhome|coldwell|propnex|dreamhouse|erahouse|leads|realty|sinar ?mas ?land|smart ?agent|rumah ?123|lamudi|jaya ?real|properti|property)\b/i;
+const LS_KANTOR = /\b(gp\b|gading ?pro|ray ?white|era ?house|era\b|century ?21|c21|re\/?max|remax|pinhome|coldwell|propnex|dreamhouse|erahouse|leads|realty|sinar ?mas ?land|smart ?agent|rumah ?123|lamudi|jaya ?real|properti|property)\b/i;
 const LS_HP = /(?:\+?62|0)\s?8[\d\s.\-]{7,14}\d/g;
 const LS_UANG_KATA = /(harga|hrg|price|open|budget|nett?|ask|nego|jual|rp|max|maks|dp)/i;
 
@@ -4213,7 +4213,8 @@ function uangDiBaris(baris) {
     const panjang = /^(miliar|milyar|milliar|juta|jt|ribu|rb)$/i.test(unit);
     let nilai = NaN, rentang = false;
     if (sat && (panjang || adaKata || /^[MB]$/.test(unit))) {
-      const a = angkaID(m[2] || m[1]);
+      const mentahAngka = m[2] || m[1];
+      const a = (sat >= 1e9 && /^\d{1,2}\.\d{3}$/.test(mentahAngka)) ? parseFloat(mentahAngka) : angkaID(mentahAngka);
       nilai = a * sat;
       rentang = !!m[2];
     } else if (!sat && adaRp) {
@@ -4224,6 +4225,26 @@ function uangDiBaris(baris) {
     hasil.push({ nilai: Math.round(nilai), skor: (adaKata ? 2 : 0) + (adaRp ? 1 : 0), rentang: rentang });
   }
   return hasil;
+}
+
+function pecahLokasi(t) {
+  let s = ' ' + String(t || '') + ' ';
+  const daftar = [
+    [/\bjak(?:arta)?\.? ?sel(?:atan)?\b/i, 'Jakarta Selatan'], [/\bjak(?:arta)?\.? ?bar(?:at)?\b/i, 'Jakarta Barat'],
+    [/\bjak(?:arta)?\.? ?ut(?:ara)?\b/i, 'Jakarta Utara'], [/\bjak(?:arta)?\.? ?pus(?:at)?\b/i, 'Jakarta Pusat'],
+    [/\bjak(?:arta)?\.? ?tim(?:ur)?\b/i, 'Jakarta Timur'], [/\btang\.? ?sel(?:atan)?\b|\btangerang selatan\b/i, 'Tangerang Selatan'],
+    [/\bkab(?:upaten)?\.? tangerang\b/i, 'Kab. Tangerang'], [/\bkota tangerang\b/i, 'Kota Tangerang'],
+    [/\bdepok\b/i, 'Depok'], [/\b(?:kota )?bekasi\b/i, 'Kota Bekasi'], [/\b(?:kota )?bogor\b/i, 'Kota Bogor'],
+    [/\bsurabaya\b/i, 'Surabaya'], [/\b(?:kota )?bandung\b/i, 'Kota Bandung'], [/\b(?:kota )?semarang\b/i, 'Kota Semarang']
+  ];
+  let kota = '';
+  for (let i = 0; i < daftar.length && !kota; i++) {
+    if (daftar[i][0].test(s)) { kota = daftar[i][1]; s = s.replace(daftar[i][0], ' '); }
+  }
+  if (!kota && /\btangerang\b/i.test(s) && /\b(cikupa|balaraja|cisauk|tigaraksa|curug|legok|panongan|jambe|kelapa dua|gading serpong|pagedangan)\b/i.test(s)) { kota = 'Kab. Tangerang'; s = s.replace(/\btangerang\b/i, ' '); }
+  s = s.replace(/\b(?:di|lokasi|strategis|premium)\b/gi, ' ').replace(/\bjakarta\b\s*$/i, ' ');
+  const area = s.replace(/[,;]+/g, ' ').replace(/\s+-\s+$|^\s+-\s+/g, ' ').replace(/\s+/g, ' ').replace(/^[\s-]+|[\s-]+$/g, '');
+  return { lokasi: area && kota ? area + ', ' + kota : (kota || area), kota: !!kota };
 }
 
 function bersihkanTeks(t) {
@@ -4240,7 +4261,8 @@ function bacaListing(mentah) {
   const ragu = {};
   const catatan = [];
   // Harga lama yang dicoret (~1.8M~) tidak dipakai sebagai harga, hanya dicatat.
-  let teks = String(mentah || '').replace(/(^|\s)~([^\s~]+)~(?=\s|$)/g, function (x, a1, v) { catatan.push('Harga lama (dicoret): ' + v); return a1; });
+  const tautan = [];
+  let teks = String(mentah || '').replace(/https?:\/\/(?!(?:api\.)?wa\.me)\S+/gi, function (u) { tautan.push('Link: ' + u.replace(/[).,;*_]+$/, '')); return ' '; }).replace(/(^|\s)~([^\s~]+)~(?=\s|$)/g, function (x, a1, v) { catatan.push('Harga lama (dicoret): ' + v); return a1; });
   teks = bersihkanTeks(teks).trim().slice(0, 4000);
   const nilai = {
     tipe: 'stok', nama: '', jenis: '', tawar: '', lokasi: '', luas_tanah: '', luas_bangunan: '', lantai: '',
@@ -4258,6 +4280,7 @@ function bacaListing(mentah) {
 
   teks = teks.replace(/^\s*(forwarded|diteruskan)\s*$/gim, '');
   // Harga lama yang dicoret (~1.8M~): tidak dipakai sebagai harga, hanya dicatat.
+  teks = teks.replace(/\(?\s*(?:spek(?:ifikasi)?\s+)?bangunan\s*(?:pxl|p\s*x\s*l|ukuran|dimensi)\s*[:=]?\s*(\d[\d.,]*)\s*[x×]\s*(\d[\d.,]*)\s*(?:m|meter)?\s*\)?/gi, function (x, p1, l1) { catatan.push('P × L bangunan: ' + p1 + ' x ' + l1 + ' m'); return ' '; });
   // Nomor HP dan tautan dikeluarkan dulu supaya angkanya tidak terbaca sebagai harga atau luas.
   const nomor = [];
   teks = teks.replace(/(?:https?:\/\/)?(?:api\.)?wa\.me\/(?:send\?phone=)?(\+?\d{9,16})\S*/gi, function (x, d) { nomor.push(d); return ' ◆ '; });
@@ -4499,6 +4522,11 @@ function bacaListing(mentah) {
     }
     nilai.lokasi = nilai.lokasi.replace(/^lokasi\s+(?:premium|strategis|bagus)\s+/i, '');
   }
+  if (!nilai.lokasi && judulAsli) {
+    const seg = judulAsli.split(/\s+[-–]\s+/);
+    if (seg.length >= 2) nilai.lokasi = seg.slice(1).join(' - ');
+  }
+  if (nilai.lokasi) { const pl = pecahLokasi(nilai.lokasi); nilai.lokasi = pl.lokasi; if (!pl.kota) ragu.lokasi = true; }
   if (!nilai.nama && nilai.jenis) nilai.nama = namaJenis(nilai.jenis) + (nilai.lokasi ? ' ' + nilai.lokasi : '');
 
   /* ── agen ── */
@@ -4578,7 +4606,7 @@ function bacaListing(mentah) {
 
   if (nilai.tipe === 'stok' && !nilai.harga && !nilai.luas_tanah && !nilai.luas_bangunan) ragu.tipe = true;
   // Keterangan tambahan: baris yang bukan data yang dikenal masuk ke catatan.
-  const bukanKeterangan = /^(lt|l\.t|lb|l\.b|luas|dimensi|ukuran|pxl|kt|km|kamar (tidur|mandi)|kmr\.? ?(tidur|mandi)|harga|hrg|price|open|nett?|nego|hadap|menghadap|shm|hgb|shgb|ajb|girik|sertifikat|legalitas|contact|kontak|hub|hubungi|cp\b|call|info|wa\b|lokasi|alamat|area|dll|rp\b|◆|(bangunan|tanah|lantai)\s*[:=]?\s*\d|\d+\s*(lantai|tingkat|lt|kt|km|m2|m²))/i;
+  const bukanKeterangan = /^((?:(?:link|video|foto)\b[^:\n]{0,15}|spesifikasi)\s*:?\s*$|lt|l\.t|lb|l\.b|luas|dimensi|ukuran|pxl|kt|km|kamar (tidur|mandi)|kmr\.? ?(tidur|mandi)|harga|hrg|price|open|nett?|nego|hadap|menghadap|shm|hgb|shgb|ajb|girik|sertifikat|legalitas|contact|kontak|hub|hubungi|cp\b|call|info|wa\b|lokasi|alamat|area|dll|rp\b|◆|(bangunan|tanah|lantai)\s*[:=]?\s*\d|\d+\s*(lantai|tingkat|lt|kt|km|m2|m²))/i;
   const sisa = [];
   baris.forEach(function (b, i) {
     if (dipakai[i]) return;
@@ -4586,7 +4614,7 @@ function bacaListing(mentah) {
     if (t.length < 4 || sapaan.test(t) || bukanKeterangan.test(t)) return;
     sisa.push(t);
   });
-  const tambahan = [catatan.join(' · '), sisa.join('\n')].filter(Boolean).join('\n').slice(0, 1000);
+  const tambahan = [catatan.join(' · '), tautan.join('\n'), sisa.join('\n')].filter(Boolean).join('\n').slice(0, 1000);
   if (tambahan) nilai.catatan_otomatis = tambahan;
   return { nilai: nilai, ragu: ragu };
 }
@@ -4901,8 +4929,7 @@ function layarFormListing(isi, p) {
   const tawar = kuning(grupPilihan(v.tipe === 'dicari' ? 'Mau beli atau sewa?' : 'Dijual atau disewakan?', 'Boleh kosong', [{ nilai: 'jual', label: v.tipe === 'dicari' ? 'Beli' : 'Dijual' }, { nilai: 'sewa', label: v.tipe === 'dicari' ? 'Sewa' : 'Disewakan' }], v.tawar || null, null, true), 'tawar');
   const nama = kuning(bidangTeks('fLNama', 'Judul', 'Wajib', rapiJudul_(v.nama, false), { autocomplete: 'off', maxlength: '120', placeholder: 'Contoh: Rumah Onyx Boulevard' }), 'nama');
   pasangRapi(nama.isian, function (x) { return rapiJudul_(x, false); });
-  const lokasi = kuning(bidangTeks('fLLokasi', 'Lokasi', 'Boleh kosong', rapiJudul_(v.lokasi, false), { autocomplete: 'off', maxlength: '120', placeholder: 'Contoh: Alam Sutera, Tangerang Selatan' }), 'lokasi');
-  pasangRapi(lokasi.isian, function (x) { return rapiJudul_(x, false); });
+  const lokasi = kuning(bidangArea('fLLokasi', 'Lokasi', 'Ketik area, pilih dari saran', rapiJudul_(v.lokasi, false)), 'lokasi');
 
   const awalJenis = v.jenis || '';
   const jenisLain = /^Lainnya: ?/.test(awalJenis);
@@ -4985,7 +5012,7 @@ function layarFormListing(isi, p) {
     const kirim = {
       mode: ubah ? 'ubah' : 'baru', id_listing: idListing, tipe: tipe.nilai(), nama: nilaiNama,
       jenis: !jenis.nilai() ? '' : jenis.nilai() === 'Lainnya' ? 'Lainnya: ' + teksJenis : jenis.nilai(),
-      tawar: tawar.nilai() || '', lokasi: rapiJudul_(lokasi.isian.value, false),
+      tawar: tawar.nilai() || '', lokasi: lokasi.nilai(),
       luas_tanah: lt.nilai(), luas_bangunan: lb.nilai(), panjang_tanah: pj.nilai(), lebar_tanah: le.nilai(), lantai: lantai.nilai(), kamar_tidur: kt.nilai(), kamar_mandi: km.nilai(),
       sertifikat: !sert.nilai() ? '' : sert.nilai() === 'Lainnya' ? 'Lainnya: ' + teksSert : sert.nilai(),
       menghadap: hadap.nilai() || '', harga: harga.nilai(), nego: nego.nilai() || '',
