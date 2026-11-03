@@ -93,7 +93,7 @@ const CONFIG = {
   MARKA_TEKS: 'Pudji',        // tulisan di bawah logo watermark foto properti
   NO_HP_PEMILIK: '0813 8279 9845',   // kaki gambar promo dan isian Nama dan HP agen
   FOTO_PER_HALAMAN: 6,        // foto per halaman di layar Bagikan (2 kolom x 3 baris)
-  VERSI_SERVER_MIN: '2.6'     // versi Code.gs yang dibutuhkan tampilan ini
+  VERSI_SERVER_MIN: '2.7'     // versi Code.gs yang dibutuhkan tampilan ini
 };
 
 /* ── Daftar tetap ─────────────────────────────────────────── */
@@ -1307,17 +1307,32 @@ async function muatData(tujuan) {
 
 /** Data dari server: isian yang belum ada (server lama) diberi nilai kosong supaya layar tidak rusak. */
 function terimaData(d) {
-  d.klien = (d.klien || []).map(function (k) {
+  // 2.7: isian kosong tidak dikirim server; di sini diisi lagi supaya bentuk datanya tetap sama.
+  const sk = d.skema || {};
+  const bukaPak = function (x) {
+    if (!x || !x.k) return x || [];
+    return x.b.map(function (r) { const o = {}; for (let i = 0; i < x.k.length; i++) o[x.k[i]] = r[i]; return o; });
+  };
+  d.klien = bukaPak(d.klien); d.properti = bukaPak(d.properti); d.dokumen = bukaPak(d.dokumen); d.listing = bukaPak(d.listing);
+  S.msServer = d.ms || 0;
+  const isiSkema = function (daftar, kunci) {
+    daftar = daftar || [];
+    if (kunci && kunci.length) daftar.forEach(function (r) { for (let i = 0; i < kunci.length; i++) if (!(kunci[i] in r)) r[kunci[i]] = ''; });
+    return daftar;
+  };
+  d.klien = isiSkema(d.klien, sk.klien).map(function (k) {
     return Object.assign({ kebutuhan_cara: '', kebutuhan_kondisi: '', budget: '', status_beli: k.peran === 'Pembeli' ? 'Mencari' : '', hubungi_tanggal: '', hubungi_catatan: '' }, k);
   });
-  d.properti = (d.properti || []).map(function (p) {
+  d.properti = isiSkema(d.properti, sk.properti).map(function (p) {
     const lama = !('dijual' in p);
     const t = lama ? tawaranDariLama(p.penawaran) : {};
     return Object.assign({ kondisi: '', dijual: false, disewakan: false, harga_jual: '', harga_sewa: '', satuan_sewa: '', luas_tanah: '', luas_bangunan: '',
       kamar_tidur: '', kamar_mandi: '', sertifikat: '', komisi_jenis: '', komisi_nilai: '', tanggal_sold: '' }, p, t);
   });
-  d.dokumen = d.dokumen || [];
-  d.listing = d.listing || [];
+  d.dokumen = isiSkema(d.dokumen, sk.dokumen);
+  d.listing = isiSkema(d.listing, sk.listing);
+  // Listing yang belum dimuat: hanya [kode, jenis, baru?] supaya lencana tetap tepat.
+  d.sisaListing = new Map((d.listingSisa || []).map(function (x) { return [x[0], { tipe: x[1], baru: !!x[2] }]; }));
   S.data = d;
 }
 
@@ -2390,7 +2405,7 @@ function infoKecepatan() {
   const d = S.data;
   const angka = function (n) { return String(n).replace('.', ','); };
   return el('p', { class: 'kecil redup info-kecepatan', text: 'Data ' + angka((S.ukuranData / 1048576).toFixed(1)) + ' MB · dimuat ' + angka((S.waktuMuat / 1000).toFixed(1)) + ' detik · ' +
-    d.klien.length + ' klien, ' + d.properti.length + ' properti' + (d.jumlahArsip ? ' · ' + d.jumlahArsip + ' di arsip' : '') });
+    d.klien.length + ' klien, ' + d.properti.length + ' properti' + (S.msServer ? ' · server ' + angka((S.msServer / 1000).toFixed(1)) + ' detik' : '') + (d.jumlahArsip ? ' · ' + d.jumlahArsip + ' di arsip' : '') });
 }
 
 function layarBeranda(isi) {
@@ -4629,7 +4644,20 @@ function cariListing(id) { return daftarListing().find(function (l) { return l.i
 function listingSelesai(l) { return LISTING_SELESAI.indexOf(l.status) >= 0; }
 /** Jumlah listing yang masih berstatus Baru (belum disentuh). Dipakai lencana merah. Selalu dihitung dari data terkini. */
 function jumlahListingBaru(tipe) {
-  return daftarListing().filter(function (l) { return (l.status || 'Baru') === 'Baru' && (!tipe || l.tipe === tipe); }).length;
+  let n = daftarListing().filter(function (l) { return (l.status || 'Baru') === 'Baru' && (!tipe || l.tipe === tipe); }).length;
+  if (S.data && S.data.sisaListing) S.data.sisaListing.forEach(function (x) { if (x.baru && (!tipe || x.tipe === tipe)) n++; });
+  return n;
+}
+
+/** 2.7: listing yang baru diambil dari server dimasukkan ke daftar dan keluar dari "belum dimuat". */
+function gabungListingBaru(daftar, kunci) {
+  let baru = 0;
+  (daftar || []).forEach(function (l) {
+    (kunci || []).forEach(function (k) { if (!(k in l)) l[k] = ''; });
+    if (S.data.sisaListing) S.data.sisaListing.delete(l.id_listing);
+    if (!S.data.listing.some(function (x) { return x.id_listing === l.id_listing; })) { S.data.listing.push(l); baru++; }
+  });
+  return baru;
 }
 
 function umurListingHari(l) {
@@ -4810,6 +4838,20 @@ function layarListing(isi, p) {
       return !aktifKeyword || teksCariListing(l).indexOf(aktifKeyword) >= 0;
     }).sort(function (a, b) { return String(b.dibuat_pada).localeCompare(String(a.dibuat_pada)); });
     wadah.append(el('p', { class: 'redup jarak-atas-kecil', 'aria-live': 'polite', text: daftar.length + ' listing' + (aktifKeyword ? ' ditemukan' : '') }));
+    if (aktifKeyword && F.totalCari > 100) wadah.append(el('p', { class: 'kecil redup', text: 'Menampilkan 100 teratas dari ' + F.totalCari + '. Ketik kata kunci yang lebih khusus.' }));
+    const sisaN = S.data.sisaListing ? S.data.sisaListing.size : 0;
+    const tombolMuat = !sisaN || aktifKeyword ? null : el('button', { type: 'button', class: 'tombol tombol-kedua jarak-atas-kecil', onclick: async function () {
+      tombolMuat.disabled = true; kosongkan(tombolMuat); tombolMuat.append(el('span', { text: 'Memuat...' }));
+      try {
+        const j = await panggil('ambilListingBanyak', { ids: Array.from(S.data.sisaListing.keys()).slice(0, 300) });
+        if (j.ok) gabungListingBaru(j.data.listing, j.data.skema);
+        else { tombolMuat.disabled = false; kosongkan(tombolMuat); tombolMuat.append(el('span', { text: 'Belum bisa memuat. Coba lagi' })); return; }
+      } catch (e) {
+        if (e instanceof GalatSesi) return;
+        tombolMuat.disabled = false; kosongkan(tombolMuat); tombolMuat.append(el('span', { text: 'Periksa internet, lalu coba lagi' })); return;
+      }
+      gambar();
+    } }, el('span', { text: 'Muat lebih banyak (' + sisaN + ' lagi)' }));
     if (!daftar.length) {
       wadah.append(el('div', { class: 'kartu kosong' },
         el('p', { class: 'tebal', text: semua.length ? 'Tidak ada yang cocok dengan pilihan ini.' : (F.tab === 'stok' ? 'Belum ada stok.' : 'Belum ada yang dicari.') }),
@@ -4817,9 +4859,29 @@ function layarListing(isi, p) {
       return;
     }
     wadah.append(daftarBertahap(daftar, kartuListing, el('div')));
+    if (tombolMuat) wadah.append(tombolMuat);
+  }
+  let jedaCari = 0;
+  function cariDiServer(q) {
+    clearTimeout(jedaCari);
+    if (!S.data.sisaListing || !S.data.sisaListing.size || norm(q).length < 2) { F.totalCari = 0; return; }
+    jedaCari = setTimeout(async function () {
+      try {
+        const j = await panggil('cariListing', { q: q.trim() });
+        if (!j.ok || input.value !== q) return;
+        F.totalCari = j.data.total || 0;
+        const baru = gabungListingBaru(j.data.listing, j.data.skema);
+        if (baru || F.totalCari > 100) {
+          const fokusAwal = document.activeElement === input;
+          gambar();
+          if (fokusAwal) { input.focus(); const n = input.value.length; try { input.setSelectionRange(n, n); } catch (e) { /* abaikan */ } }
+        }
+      } catch (e) { /* tanpa internet: hasil dari data yang sudah ada tetap tampil */ }
+    }, 500);
   }
   input.addEventListener('input', function () {
     gantiParam({ q: input.value });
+    cariDiServer(input.value);
     // hanya daftar yang digambar ulang supaya ketikan tidak hilang fokus
     const fokusAwal = document.activeElement === input;
     gambar();
