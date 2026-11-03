@@ -1109,3 +1109,13 @@ body.layar-masuk .isi { max-width: none; padding: 0; }
   content: 'Mohon dicek'; font-size: 15px; font-weight: 800; color: #6B4A00; background: #F5D866; border-radius: 9999px; padding: 2px 10px;
 }
 .bidang.kuning .isian { background: #FFFDF0; }
+
+.sub-lama { color: #8A5A00 !important; font-weight: 700; }
+.chip-arsip { background: #E4E0D6; color: #45413A; }
+.chip-arsip::before { display: none; }
+.chip-arsip .ikon-mini { width: 16px; height: 16px; margin-right: 4px; }
+.info-kecepatan { text-align: center; margin-top: 20px; }
+.penanda-bertahap { height: 1px; }
+
+.chip-desak { background: #FDE3D0; color: #8A3B07; font-weight: 700; }
+.chip-desak::before { display: none; }

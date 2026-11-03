@@ -1,6 +1,9 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
+   Versi 5.1 — 2 November 2026. Butuh Code.gs 2.6. Baru: data lama (arsip) tetap muncul di pencarian dengan label Arsip;
+   daftar panjang tampil bertahap saat digulir; Listing punya panjang x lebar, keterangan tambahan masuk ke catatan,
+   umur listing; baris kecil di Beranda yang menunjukkan ukuran dan lama muat data.
    Versi 5.0 — 2 November 2026. Butuh Code.gs 2.5. Baru: menu Listing untuk info properti dari grup WhatsApp agen lain
    (tombol Tempel dari WA, pembaca pesan tanpa AI, isian kuning bila kurang yakin, pencocokan dengan pembeli Anda,
    status dan komisi kesepakatan). Lencana merah menu Listing = jumlah yang masih berstatus Baru.
@@ -90,7 +93,7 @@ const CONFIG = {
   MARKA_TEKS: 'Pudji',        // tulisan di bawah logo watermark foto properti
   NO_HP_PEMILIK: '0813 8279 9845',   // kaki gambar promo dan isian Nama dan HP agen
   FOTO_PER_HALAMAN: 6,        // foto per halaman di layar Bagikan (2 kolom x 3 baris)
-  VERSI_SERVER_MIN: '2.5'     // versi Code.gs yang dibutuhkan tampilan ini
+  VERSI_SERVER_MIN: '2.6'     // versi Code.gs yang dibutuhkan tampilan ini
 };
 
 /* ── Daftar tetap ─────────────────────────────────────────── */
@@ -130,6 +133,8 @@ const S = {
   gisSiap: false,
   dibangunkan: false,
   perluMuatUlang: false,
+  ukuranData: 0,           // ukuran jawaban muatData terakhir (huruf)
+  waktuMuat: 0,            // lama muatData terakhir (ms)
   menyegarkan: false
 };
 
@@ -165,6 +170,7 @@ function kosongkan(n) { while (n.firstChild) n.removeChild(n.firstChild); }
 
 const IKON = {
   cari: ['M18 11a7 7 0 1 1-14 0a7 7 0 1 1 14 0z', 'M16.2 16.2L21 21'],
+  arsip: ['M4 4h16v4H4z', 'M5.5 8v12h13V8', 'M10 12.5h4'],
   tempel: ['M9 4h6v3H9z', 'M7 5.5H5.5A1.5 1.5 0 0 0 4 7v13a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 20V7a1.5 1.5 0 0 0-1.5-1.5H17', 'M8.5 12h7', 'M8.5 16h5'],
   daftar: ['M9 6h11', 'M9 12h11', 'M9 18h11', 'M4.5 6h.01', 'M4.5 12h.01', 'M4.5 18h.01'],
   orang: ['M16 8a4 4 0 1 1-8 0a4 4 0 1 1 8 0z', 'M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8'],
@@ -845,6 +851,7 @@ function GalatSesi() { this.message = 'sesi'; }
 async function panggil(aksi, data, opsi) {
   opsi = opsi || {};
   const pengendali = new AbortController();
+  const mulaiMuat = performance.now();
   const waktu = setTimeout(function () { pengendali.abort(); }, opsi.batas || CONFIG.BATAS_WAKTU_MS);
   let j;
   try {
@@ -858,7 +865,9 @@ async function panggil(aksi, data, opsi) {
       redirect: 'follow'
     });
     if (!res.ok) throw new GalatJaringan('http ' + res.status);
-    j = await res.json();
+    const teksMentah = await res.text();
+    j = JSON.parse(teksMentah);
+    if (aksi === 'muatData') { S.ukuranData = teksMentah.length; S.waktuMuat = performance.now() - mulaiMuat; }
   } catch (e) {
     if (e instanceof GalatJaringan) throw e;
     throw new GalatJaringan(e && e.name);
@@ -2375,6 +2384,15 @@ function peringatanCadangan() {
   };
 }
 
+/** Baris kecil di bawah Beranda: seberapa besar dan seberapa lama data dimuat (untuk memantau kecepatan). */
+function infoKecepatan() {
+  if (!S.ukuranData) return null;
+  const d = S.data;
+  const angka = function (n) { return String(n).replace('.', ','); };
+  return el('p', { class: 'kecil redup info-kecepatan', text: 'Data ' + angka((S.ukuranData / 1048576).toFixed(1)) + ' MB · dimuat ' + angka((S.waktuMuat / 1000).toFixed(1)) + ' detik · ' +
+    d.klien.length + ' klien, ' + d.properti.length + ' properti' + (d.jumlahArsip ? ' · ' + d.jumlahArsip + ' di arsip' : '') });
+}
+
 function layarBeranda(isi) {
   kepala({ judul: 'Arsip Properti', tanpaKembali: true, nav: 'beranda' });
   document.body.classList.add('layar-beranda');
@@ -2509,7 +2527,7 @@ function layarBeranda(isi) {
   const aksi = el('div', { class: 'stat-aksi g-aksi' }, tombol('hanya-hp', 'keluar', 'Keluar', keluar));
   const lainLaptop = el('div', { class: 'g-lainlaptop hanya-laptop' }, tombol('tombol-kedua', 'perangkat', 'Keluar dari semua HP', keluarSemua));
 
-  isi.append(el('div', { class: 'beranda' }, kartuIngat, kartuUltah(), hero, cari, kisi, ringkas, kartuTerbaru, papan, lain, aksi, lainLaptop));
+  isi.append(el('div', { class: 'beranda' }, kartuIngat, kartuUltah(), hero, cari, kisi, ringkas, kartuTerbaru, papan, lain, aksi, lainLaptop, infoKecepatan()));
 
   /** Perbarui tanpa menutup layar: data lama tetap tampil sampai data baru datang. */
   async function perbarui() {
@@ -2680,10 +2698,10 @@ function tampilHasilCari(wadah, q, mode, tampil, hapusKata, F, ubahF) {
   const urutK = function (a, b) { return urutNama(a, b, 'nama'); };
   const urutP = function (a, b) { return urutNama(a, b, 'nama_properti'); };
   const kartuKlien = function (daftar, tampilan) {
-    return el('div', { class: 'daftar' }, daftar.map(function (k) { return barisKlien(k, function () { pilihKlienDariCari(mode, k); }, tampilan); }));
+    return daftarBertahap(daftar, function (k) { return barisKlien(k, function () { pilihKlienDariCari(mode, k); }, tampilan); }, el('div', { class: 'daftar' }));
   };
   const kartuProp = function (daftar) {
-    return el('div', { class: 'daftar' }, daftar.map(function (pr) { return barisProperti(pr, function () { pilihPropertiDariCari(mode, pr); }, true); }));
+    return daftarBertahap(daftar, function (pr) { return barisProperti(pr, function () { pilihPropertiDariCari(mode, pr); }, true); }, el('div', { class: 'daftar' }));
   };
   const kosongSaring = function (teks, hapusSaring) {
     return el('div', { class: 'kosong' },
@@ -2695,7 +2713,7 @@ function tampilHasilCari(wadah, q, mode, tampil, hapusKata, F, ubahF) {
   if (!qn) {
     if (tampil === 'properti' && mode === 'lihat') {
       // Daftar properti dengan penyaring area, bangunan, ditawarkan, harga, progres
-      const semuaP = S.data.properti.slice();
+      const semuaP = S.data.properti.filter(function (pr) { return !pr.arsip; });
       const areaAda = daftarArea(true);
       const hapusSaringP = function () { ubahF({ areaP: '', bangunanP: '', tawarP: '', progresP: '', hargaP: '', khususP: '' }); };
       wadah.append(lipatSaring([
@@ -2723,12 +2741,12 @@ function tampilHasilCari(wadah, q, mode, tampil, hapusKata, F, ubahF) {
 
     // Daftar klien: tab Penjual dan Pembeli
     const jumlah = { Penjual: 0, Pembeli: 0 };
-    S.data.klien.forEach(function (k) { if (jumlah[k.peran] !== undefined) jumlah[k.peran]++; });
+    S.data.klien.forEach(function (k) { if (!k.arsip && jumlah[k.peran] !== undefined) jumlah[k.peran]++; });
     wadah.append(segmen(
       [{ kode: 'Penjual', label: 'Penjual', lencana: jumlah.Penjual }, { kode: 'Pembeli', label: 'Pembeli', lencana: jumlah.Pembeli }],
       F.peran, function (v) { ubahF({ peran: v }); }, 'segmen-2'));
 
-    let daftar = S.data.klien.filter(function (k) { return k.peran === F.peran; });
+    let daftar = S.data.klien.filter(function (k) { return k.peran === F.peran && !k.arsip; });
     let ket;
     let disaring;
     if (F.peran === 'Penjual') {
@@ -2777,20 +2795,24 @@ function tampilHasilCari(wadah, q, mode, tampil, hapusKata, F, ubahF) {
 
   const awalDulu = function (teks) { return norm(teks).indexOf(qn) === 0 ? 0 : 1; };
   const klien = S.data.klien.filter(function (k) {
+    if (k.arsip) return false;
     if (norm(k.nama).indexOf(qn) >= 0) return true;
     return qd.length >= 3 && qd.length === q.replace(/[\s+\-.()]/g, '').length &&
       varianHp(k.no_hp).some(function (v) { return v.indexOf(qd) >= 0; });
   }).sort(function (a, b) { return (awalDulu(a.nama) - awalDulu(b.nama)) || urutK(a, b); });
   const properti = S.data.properti.filter(function (pr) {
-    return norm(pr.nama_properti + ' ' + pr.alamat + ' ' + (pr.area || '')).indexOf(qn) >= 0;
+    return !pr.arsip && norm(pr.nama_properti + ' ' + pr.alamat + ' ' + (pr.area || '')).indexOf(qn) >= 0;
   }).sort(urutP);
 
   if (!klien.length && !properti.length) {
-    wadah.append(el('div', { class: 'kosong' },
+    const tidakKetemu = el('div', { class: 'kosong' },
       el('div', { class: 'lingkar-ikon' }, ikon('cari')),
       el('h2', { text: 'Tidak ketemu. Coba nama lain.' }),
       el('p', { class: 'redup', text: 'Periksa ejaan nama, nomor HP, atau nama jalan.' }),
-      tombol('tombol-kedua', 'silang', 'Hapus kata cari', hapusKata)));
+      tombol('tombol-kedua', 'silang', 'Hapus kata cari', hapusKata));
+    wadah.append(tidakKetemu);
+    // Bila arsip menemukan sesuatu, pesan "tidak ketemu" disembunyikan.
+    cariDiArsip(wadah, q, mode, function () { tidakKetemu.classList.add('tersembunyi'); });
     umumkan('Tidak ketemu.');
     return;
   }
@@ -2799,6 +2821,7 @@ function tampilHasilCari(wadah, q, mode, tampil, hapusKata, F, ubahF) {
     if (bagian === 'klien' && klien.length) wadah.append(judulBagian('Klien (' + klien.length + ')'), kartuKlien(klien));
     if (bagian === 'properti' && properti.length) wadah.append(judulBagian('Properti (' + properti.length + ')'), kartuProp(properti));
   });
+  cariDiArsip(wadah, q, mode, null);
   umumkan(klien.length + ' klien dan ' + properti.length + ' properti ditemukan.');
 }
 
@@ -2810,6 +2833,7 @@ function layarProfil(isi, p) {
   const k = cariKlien(p.id);
   if (!k) return tidakAda();
   kepala({ judul: 'Detail Klien' });
+  if (k.arsip) isi.append(buatBanner({ jenis: 'info', judul: 'Ini data arsip', pesan: 'Sudah lama tidak diubah. Kalau Anda mengubahnya, otomatis kembali aktif.', tanpaTutup: true }));
   catatBaruDibuka(k.id_klien);
   const props = propertiKlien(k.id_klien);
   const pembeli = k.peran === 'Pembeli';
@@ -3007,6 +3031,7 @@ function layarProperti(isi, p) {
   const k = pr ? cariKlien(pr.id_klien) : null;
   if (!pr || !k) return tidakAda();
   kepala({ judul: 'Detail Properti' });
+  if (pr.arsip) isi.append(buatBanner({ jenis: 'info', judul: 'Ini data arsip', pesan: 'Sudah lama tidak diubah. Kalau Anda mengubahnya, otomatis kembali aktif.', tanpaTutup: true }));
   catatBaruDibuka(k.id_klien);
   const st = S.layar;
   const wb = el('div');
@@ -4212,12 +4237,14 @@ function bersihkanTeks(t) {
 
 /** Hasil: { nilai: {...isian}, ragu: { namaIsian: true }, catatan: 'teks' } */
 function bacaListing(mentah) {
-  let teks = bersihkanTeks(mentah).trim().slice(0, 4000);
   const ragu = {};
   const catatan = [];
+  // Harga lama yang dicoret (~1.8M~) tidak dipakai sebagai harga, hanya dicatat.
+  let teks = String(mentah || '').replace(/(^|\s)~([^\s~]+)~(?=\s|$)/g, function (x, a1, v) { catatan.push('Harga lama (dicoret): ' + v); return a1; });
+  teks = bersihkanTeks(teks).trim().slice(0, 4000);
   const nilai = {
     tipe: 'stok', nama: '', jenis: '', tawar: '', lokasi: '', luas_tanah: '', luas_bangunan: '', lantai: '',
-    kamar_tidur: '', kamar_mandi: '', sertifikat: '', menghadap: '', harga: '', nego: '',
+    kamar_tidur: '', kamar_mandi: '', sertifikat: '', menghadap: '', harga: '', nego: '', panjang_tanah: '', lebar_tanah: '',
     agen_nama: '', agen_kantor: '', agen_hp: ''
   };
 
@@ -4229,6 +4256,8 @@ function bacaListing(mentah) {
     return b;
   }).join('\n');
 
+  teks = teks.replace(/^\s*(forwarded|diteruskan)\s*$/gim, '');
+  // Harga lama yang dicoret (~1.8M~): tidak dipakai sebagai harga, hanya dicatat.
   // Nomor HP dan tautan dikeluarkan dulu supaya angkanya tidak terbaca sebagai harga atau luas.
   const nomor = [];
   teks = teks.replace(/(?:https?:\/\/)?(?:api\.)?wa\.me\/(?:send\?phone=)?(\+?\d{9,16})\S*/gi, function (x, d) { nomor.push(d); return ' ◆ '; });
@@ -4269,10 +4298,16 @@ function bacaListing(mentah) {
     nilai.luas_tanah = ambilLuas(m[1]); nilai.luas_bangunan = ambilLuas(m[2]);
     dasar = dasar.replace(m[0], ' ');
   }
+  m = /(?:dimensi|ukuran|pxl|p\s*x\s*l|panjang\s*[x×]\s*lebar)\s*(?:tanah)?\s*[:=]?\s*(\d+(?:[.,]\d+)?)\s*(?:m|meter|mtr)?\s*[x×]\s*(\d+(?:[.,]\d+)?)/.exec(dasar);
+  if (m) {
+    nilai.panjang_tanah = ambilLuas(m[1]); nilai.lebar_tanah = ambilLuas(m[2]);
+    dasar = dasar.replace(m[0], ' ');
+  }
   if (!nilai.luas_tanah) {
     // ukuran 7x15 (kali) atau 7x15 = 105
     m = /(?:\blt\b|\bl\.t\.?|luas tanah|tanah|surface|land)\s*[:=.\-]?\s*(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)(?:\s*=\s*(\d[\d.,]*))?/.exec(dasar);
     if (m) {
+      if (!nilai.panjang_tanah) { nilai.panjang_tanah = ambilLuas(m[1]); nilai.lebar_tanah = ambilLuas(m[2]); }
       if (m[3]) nilai.luas_tanah = ambilLuas(m[3]);
       else { nilai.luas_tanah = ambilLuas(String(Math.round(angkaID(m[1]) * angkaID(m[2]) * 100) / 100)); ragu.luas_tanah = true; }
       dasar = dasar.replace(m[0], ' ');
@@ -4326,7 +4361,7 @@ function bacaListing(mentah) {
   m = /\bkt\s*\/\s*km\s*[:=]?\s*(\d+)\s*[\/+]\s*(\d+)/.exec(dasar) || /(\d+)\s*[\/+]\s*(\d+)\s*(?:kt\s*\/\s*km|k\.?t\s*\/\s*k\.?m)\b/.exec(dasar);
   if (m) { nilai.kamar_tidur = m[1]; nilai.kamar_mandi = m[2]; dasar = dasar.replace(m[0], ' '); }
   if (!nilai.kamar_tidur) {
-    m = /(?:\bkt\b|\bk\.t\.?|kamar tidur|bedrooms?|\bbr\b|\bbed\b)\s*[:=.\-]?\s*(\d+)(?:\s*\+\s*(\d+))?/.exec(dasar)
+    m = /(?:\bkt\b|\bk\.t\.?|kamar tidur|kmr\.? ?tidur|bedrooms?|\bbr\b|\bbed\b)\s*[:=.\-]?\s*(\d+)(?:\s*\+\s*(\d+))?/.exec(dasar)
       || /(\d+)(?:\s*\+\s*(\d+))?\s*(?:kt\b|kamar tidur|bedrooms?|\bbr\b|\bbed\b)/.exec(dasar);
     if (m) {
       nilai.kamar_tidur = m[1];
@@ -4335,8 +4370,8 @@ function bacaListing(mentah) {
     }
   }
   if (!nilai.kamar_mandi) {
-    const re1 = /(?:\bkm\b|\bk\.m\.?|kamar mandi|bathrooms?|\bbath\b)\s*[:=.\-]?\s*(\d+)(?:\s*\+\s*(\d+))?/g;
-    const re2 = /(\d+)(?:\s*\+\s*(\d+))?\s*(?:km\b|kamar mandi|bathrooms?|\bbath\b)/g;
+    const re1 = /(?:\bkm\b|\bk\.m\.?|kamar mandi|kmr\.? ?mandi|bathrooms?|\bbath\b)\s*[:=.\-]?\s*(\d+)(?:\s*\+\s*(\d+))?/g;
+    const re2 = /(\d+)(?:\s*\+\s*(\d+))?\s*(?:km\b|kamar mandi|kmr\.? ?mandi|bathrooms?|\bbath\b)/g;
     [re1, re2].some(function (re) {
       let x;
       while ((x = re.exec(dasar))) {
@@ -4358,6 +4393,7 @@ function bacaListing(mentah) {
   if (/\b(girik|petok|letter c)\b/.test(kecil)) sert.push('Girik');
   if (/\bstrata( title)?\b/.test(kecil)) sert.push('Lainnya: Strata title');
   if (/\bhak pakai\b/.test(kecil)) sert.push('Lainnya: Hak pakai');
+  if (/\bppjb\b/.test(kecil) && !sert.some(function (x) { return x !== 'AJB'; })) { sert.length = 0; sert.push('Lainnya: PPJB'); ragu.sertifikat = true; }
   if (sert.length) { nilai.sertifikat = sert[0]; if (sert.length > 1) ragu.sertifikat = true; }
 
   /* ── menghadap ── */
@@ -4388,6 +4424,7 @@ function bacaListing(mentah) {
     }
   } else if (nilai.luas_bangunan) { nilai.jenis = 'Rumah'; ragu.jenis = true; }
   else if (nilai.luas_tanah) { nilai.jenis = 'Tanah'; ragu.jenis = true; }
+  if (/Apartemen/.test(nilai.jenis) && nilai.luas_tanah && !nilai.luas_bangunan) { nilai.luas_bangunan = nilai.luas_tanah; nilai.luas_tanah = ''; delete ragu.luas_tanah; ragu.luas_bangunan = true; }
   if (nilai.jenis === 'Tanah' && nilai.luas_bangunan) { nilai.jenis = 'Rumah'; ragu.jenis = true; }
 
   /* ── harga ── */
@@ -4419,10 +4456,21 @@ function bacaListing(mentah) {
   const dataBaris = /^(lt|lb|l\.t|l\.b|kt|km|harga|hrg|price|shm|hgb|ajb|hadap|menghadap|contact|kontak|hub|hubungi|cp|call|wa\b|whatsapp|lokasi|alamat|area|luas|lantai|listrik|air|nego|note|catatan|ket|keterangan|fasilitas|sertifikat|legalitas|surat|\d|◆)/i;
   let judul = '';
   let judulDipotong = false;
+  let idxJudul = -1;
+  let judulAsli = '';
+  const awalanRe0 = /^(?:(?:new|hot|ready|open|special|exclusive|urgent|info|update|promo)\s+)*(?:listing|dijual(?:\s+cepat)?|disewakan|dikontrakkan|dicari|dibutuhkan|wts|wtb|wtr|wtl|jual|sewa|cari|mencari|butuh|turun harga|price drop)\b[\s:!\-–.,]*/i;
   for (let i = 0; i < baris.length; i++) {
     const b = baris[i].replace(/^[^A-Za-z0-9]+/, '').trim();
-    if (!b || sapaan.test(b) || dataBaris.test(b)) continue;
-    judul = b;
+    if (!b) continue;
+    const awalUnit = /^\d+\s*(?:unit|br|bed(?:room)?s?)\b[\s,.:-]*/i;
+    const b2 = awalUnit.test(b) ? b.replace(awalUnit, '') : b;
+    if (b2 === b && (sapaan.test(b) || dataBaris.test(b))) continue;
+    // baris semboyan ("DIJUAL RUGI", "BARANG LANGKA", "(dibawah hrg NJOP)") bukan judul
+    const sisa = b2.replace(awalanRe0, '').replace(/[\s!.:*-]+$/, '');
+    if (!sisa || /^(\(|rugi\b|barang langka|murah|banting|cuan|siap huni$|bu\b)/i.test(sisa)) continue;
+    judul = b2;
+    judulAsli = b2;
+    idxJudul = i;
     break;
   }
   const awalanRe = /^(?:(?:new|hot|ready|open|special|exclusive|urgent|info|update|promo)\s+)*(?:listing|dijual(?:\s+cepat)?|disewakan|dikontrakkan|dicari|dibutuhkan|wts|wtb|wtr|wtl|jual|sewa|cari|mencari|butuh|bu|turun harga|price drop)\b[\s:!\-–.,]*/i;
@@ -4445,6 +4493,11 @@ function bacaListing(mentah) {
       const d2 = /\b(?:di|daerah)\s+([A-Za-z][A-Za-z ]{2,40}?)(?=\s+(?:budget|bud|max|maks|harga|lt|lb|kt|km|shm|hgb)\b|[,.]|$)/i.exec(semua.split('\n').find(function (b) { return /\bdi\s+[A-Za-z]/i.test(b); }) || '');
       if (d2) nilai.lokasi = d2[1].trim();
     }
+    if (!nilai.lokasi || /^lokasi\s/i.test(nilai.lokasi)) {
+      const d3 = /\b(?:di|daerah|area)\s+([A-Za-z][A-Za-z0-9 .,\-]{2,80})$/i.exec(judulAsli.replace(/[\s!.:*]+$/, ''));
+      if (d3) nilai.lokasi = d3[1].trim();
+    }
+    nilai.lokasi = nilai.lokasi.replace(/^lokasi\s+(?:premium|strategis|bagus)\s+/i, '');
   }
   if (!nilai.nama && nilai.jenis) nilai.nama = namaJenis(nilai.jenis) + (nilai.lokasi ? ' ' + nilai.lokasi : '');
 
@@ -4470,6 +4523,9 @@ function bacaListing(mentah) {
     return { nama: t, kantor: '' };
   };
   let orang = null;
+  const dipakai = {};
+  if (idxJudul >= 0) dipakai[idxJudul] = true;
+  let idxOrang = -1;
   for (let i = baris.length - 1; i >= 0 && !orang; i--) {
     const b = baris[i];
     const adaHp = b.indexOf('◆') >= 0;
@@ -4492,11 +4548,21 @@ function bacaListing(mentah) {
     }
     segmen = segmen.replace(/\b(ke|no|nomor|telp|tlp|telepon|hp)\b/gi, ' ');
     let o = pisahOrang(segmen);
+    let dari = i;
     if ((!o || (!o.nama && !o.kantor) || /\d/.test(segmen)) && i > 0) {
       const sebelumnya = baris[i - 1];
       if (sebelumnya && !/\d/.test(sebelumnya) && sebelumnya.split(' ').length <= 6 && !dataBaris.test(sebelumnya)) o = pisahOrang(sebelumnya);
+      dari = i - 1;
     }
-    if (o && (o.nama || o.kantor) && /^[A-Z]/.test(o.nama || o.kantor) && !/\d{3,}/.test(o.nama + o.kantor) && (o.nama + ' ' + o.kantor).trim().split(' ').length <= 6) orang = o;
+    if (o && (o.nama || o.kantor) && /^[A-Z]/.test(o.nama || o.kantor) && !/\d{3,}/.test(o.nama + o.kantor) && (o.nama + ' ' + o.kantor).trim().split(' ').length <= 6) { orang = o; idxOrang = dari; dipakai[i] = true; dipakai[dari] = true; }
+  }
+  // Nama di baris sebelum kantor ("Juan Tan" lalu "GadingPro Alsut" lalu nomor).
+  if (orang && !orang.nama && idxOrang > 0) {
+    const sb = baris[idxOrang - 1];
+    if (sb && !/\d/.test(sb) && sb.split(' ').length <= 4 && /^[A-Z]/.test(sb) && !dataBaris.test(sb) && !sapaan.test(sb)) {
+      orang.nama = rapikanOrang(sb);
+      dipakai[idxOrang - 1] = true;
+    }
   }
   if (orang) {
     nilai.agen_nama = orang.nama;
@@ -4511,7 +4577,17 @@ function bacaListing(mentah) {
   if (!nilai.agen_hp) ragu.agen_hp = true;
 
   if (nilai.tipe === 'stok' && !nilai.harga && !nilai.luas_tanah && !nilai.luas_bangunan) ragu.tipe = true;
-  if (catatan.length) nilai.catatan_otomatis = catatan.join(' · ');
+  // Keterangan tambahan: baris yang bukan data yang dikenal masuk ke catatan.
+  const bukanKeterangan = /^(lt|l\.t|lb|l\.b|luas|dimensi|ukuran|pxl|kt|km|kamar (tidur|mandi)|kmr\.? ?(tidur|mandi)|harga|hrg|price|open|nett?|nego|hadap|menghadap|shm|hgb|shgb|ajb|girik|sertifikat|legalitas|contact|kontak|hub|hubungi|cp\b|call|info|wa\b|lokasi|alamat|area|dll|rp\b|◆|(bangunan|tanah|lantai)\s*[:=]?\s*\d|\d+\s*(lantai|tingkat|lt|kt|km|m2|m²))/i;
+  const sisa = [];
+  baris.forEach(function (b, i) {
+    if (dipakai[i]) return;
+    const t = b.replace(/^[^A-Za-z0-9]+/, '').replace(/◆/g, ' ').replace(/\s+/g, ' ').trim();
+    if (t.length < 4 || sapaan.test(t) || bukanKeterangan.test(t)) return;
+    sisa.push(t);
+  });
+  const tambahan = [catatan.join(' · '), sisa.join('\n')].filter(Boolean).join('\n').slice(0, 1000);
+  if (tambahan) nilai.catatan_otomatis = tambahan;
   return { nilai: nilai, ragu: ragu };
 }
 
@@ -4525,6 +4601,36 @@ function listingSelesai(l) { return LISTING_SELESAI.indexOf(l.status) >= 0; }
 /** Jumlah listing yang masih berstatus Baru (belum disentuh). Dipakai lencana merah. Selalu dihitung dari data terkini. */
 function jumlahListingBaru(tipe) {
   return daftarListing().filter(function (l) { return (l.status || 'Baru') === 'Baru' && (!tipe || l.tipe === tipe); }).length;
+}
+
+function umurListingHari(l) {
+  const t = Date.parse(String(l.dibuat_pada || '').replace(' ', 'T') + '+07:00');
+  return isFinite(t) ? Math.max(0, Math.floor((Date.now() - t) / 86400000)) : 0;
+}
+function teksUmurListing(l) {
+  const n = umurListingHari(l);
+  return n === 0 ? 'Masuk hari ini' : 'Masuk ' + n + ' hari lalu';
+}
+/** Mulai tampil 40; sisanya ditambah otomatis saat digulir (tanpa tombol). */
+function daftarBertahap(daftar, buat, wadah) {
+  const BATCH = 40;
+  let n = 0, pengamat = null;
+  const penanda = el('div', { class: 'penanda-bertahap', 'aria-hidden': 'true' });
+  function lagi() {
+    daftar.slice(n, n + BATCH).forEach(function (x) { wadah.insertBefore(buat(x), penanda); });
+    n += BATCH;
+    if (n >= daftar.length) { if (pengamat) pengamat.disconnect(); penanda.remove(); }
+    else if (pengamat) { pengamat.unobserve(penanda); pengamat.observe(penanda); }
+  }
+  wadah.append(penanda);
+  lagi();
+  if (n < daftar.length) {
+    if ('IntersectionObserver' in window) {
+      pengamat = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) lagi(); }, { rootMargin: '800px' });
+      pengamat.observe(penanda);
+    } else { while (n < daftar.length) lagi(); }
+  }
+  return wadah;
 }
 
 function teksCariListing(l) { return norm([l.nama, l.lokasi, l.agen_nama, l.agen_kantor, l.catatan, l.jenis].join(' ')); }
@@ -4541,6 +4647,7 @@ function ringkasListing(l) {
   if (l.jenis) bit.push(namaJenis(l.jenis));
   if (l.luas_tanah) bit.push('LT ' + angkaTampil(l.luas_tanah));
   if (l.luas_bangunan) bit.push('LB ' + angkaTampil(l.luas_bangunan));
+  if (l.panjang_tanah && l.lebar_tanah) bit.push(angkaTampil(l.panjang_tanah) + ' x ' + angkaTampil(l.lebar_tanah) + ' m');
   if (l.lantai) bit.push(l.lantai + ' lantai');
   if (l.kamar_tidur) bit.push('KT ' + l.kamar_tidur);
   if (l.kamar_mandi) bit.push('KM ' + l.kamar_mandi);
@@ -4680,7 +4787,7 @@ function layarListing(isi, p) {
         semua.length ? null : el('p', { class: 'redup', text: 'Tekan Tempel dari WA untuk mulai.' })));
       return;
     }
-    daftar.forEach(function (l) { wadah.append(kartuListing(l)); });
+    wadah.append(daftarBertahap(daftar, kartuListing, el('div')));
   }
   input.addEventListener('input', function () {
     gantiParam({ q: input.value });
@@ -4692,6 +4799,13 @@ function layarListing(isi, p) {
   gambar();
 }
 
+function labelDesakListing(l) {
+  const t = ((l.nama || '') + ' ' + (l.catatan || '')).toLowerCase();
+  if (/\b(dijual|jual) rugi\b|banting harga|turun harga|price drop/.test(t)) return 'Dijual rugi';
+  if (/\b(dijual|disewakan|dikontrakkan) cepat\b|butuh cepat|urgent/.test(t)) return /sewa|kontrak/.test(t) && !/\bdijual\b/.test(t) ? 'Disewakan cepat' : 'Dijual cepat';
+  return '';
+}
+
 function kartuListing(l) {
   const spesifikasi = ringkasListing(l);
   const cocok = chipCocokListing(l);
@@ -4701,7 +4815,8 @@ function kartuListing(l) {
     spesifikasi ? el('span', { class: 'sub', text: spesifikasi }) : null,
     el('span', { class: 'listing-harga', text: hargaListingTeks(l) }),
     namaAgenListing(l) ? el('span', { class: 'sub', text: 'Agen: ' + namaAgenListing(l) }) : null,
-    el('span', { class: 'baris-chip' }, chip(l.status || 'Baru', l.status || 'Baru'), cocok));
+    el('span', { class: 'sub' + (umurListingHari(l) >= 30 ? ' sub-lama' : ''), text: teksUmurListing(l) + (umurListingHari(l) >= 30 && !listingSelesai(l) ? '. Hapus kalau sudah tidak berlaku.' : '') }),
+    el('span', { class: 'baris-chip' }, chip(l.status || 'Baru', l.status || 'Baru'), labelDesakListing(l) ? chip('desak', labelDesakListing(l)) : null, cocok));
 }
 
 /* ── Tempel dari WA ── */
@@ -4733,7 +4848,7 @@ function dialogTempel(awal) {
 /* ── Formulir listing (baru dari tempelan, isi sendiri, atau ubah) ── */
 
 const ISIAN_LISTING_KOSONG = {
-  tipe: 'stok', nama: '', jenis: '', tawar: '', lokasi: '', luas_tanah: '', luas_bangunan: '', lantai: '', kamar_tidur: '', kamar_mandi: '',
+  tipe: 'stok', nama: '', jenis: '', tawar: '', lokasi: '', luas_tanah: '', luas_bangunan: '', panjang_tanah: '', lebar_tanah: '', lantai: '', kamar_tidur: '', kamar_mandi: '',
   sertifikat: '', menghadap: '', harga: '', nego: '', agen_nama: '', agen_kantor: '', agen_hp: '', komisi_kesepakatan: '', catatan: ''
 };
 
@@ -4746,7 +4861,7 @@ function layarFormListing(isi, p) {
   const hasil = !ubah && p.teks ? bacaListing(p.teks) : null;
   const v = Object.assign({}, ISIAN_LISTING_KOSONG, ubah ? lama : (hasil ? hasil.nilai : {}));
   if (hasil && hasil.nilai.catatan_otomatis) v.catatan = hasil.nilai.catatan_otomatis;
-  const teksAsli = ubah ? (lama.teks_asli || '') : (p.teks || '');
+  const teksAsli = ubah ? '' : (p.teks || '');
 
   // Isian yang kurang yakin: ditandai pembaca, atau penting tetapi kosong.
   const ragu = Object.assign({}, hasil ? hasil.ragu : {});
@@ -4804,6 +4919,8 @@ function layarFormListing(isi, p) {
 
   const lt = kuning(bidangAngka('fLLt', 'Luas tanah', 'm²', v.luas_tanah, true), 'luas_tanah');
   const lb = kuning(bidangAngka('fLLb', 'Luas bangunan', 'm²', v.luas_bangunan, true), 'luas_bangunan');
+  const pj = bidangAngka('fLPanjang', 'Panjang tanah', 'm', v.panjang_tanah, true);
+  const le = bidangAngka('fLLebar', 'Lebar tanah', 'm', v.lebar_tanah, true);
   const lantai = bidangAngka('fLLantai', 'Lantai', '', v.lantai, false);
   const kt = bidangAngka('fLKt', 'Kamar tidur', '', v.kamar_tidur, false);
   const km = bidangAngka('fLKm', 'Kamar mandi', '', v.kamar_mandi, false);
@@ -4832,6 +4949,7 @@ function layarFormListing(isi, p) {
   const tombolSimpan = tombol('tombol-utama', 'centang', 'Simpan listing', function () { simpan(); });
   isi.append(tipe.wadah, nama.wadah, jenis.wadah, jenisTeks.wadah, tawar.wadah, lokasi.wadah, harga.wadah, nego.wadah,
     el('div', { class: 'baris-2' }, lt.wadah, lb.wadah),
+    el('div', { class: 'baris-2' }, pj.wadah, le.wadah),
     el('div', { class: 'baris-3' }, lantai.wadah, kt.wadah, km.wadah),
     sert.wadah, sertTeks.wadah, hadap.wadah,
     judulBagian('Agen yang memposting'), agenNama.wadah, agenKantor.wadah, agenHp.wadah,
@@ -4844,7 +4962,7 @@ function layarFormListing(isi, p) {
   isi.append(tombolSimpan);
 
   async function simpan() {
-    [nama, agenHp, jenisTeks, sertTeks, lt, lb, lantai, kt, km].forEach(function (g) { g.salah(''); });
+    [nama, agenHp, jenisTeks, sertTeks, lt, lb, pj, le, lantai, kt, km].forEach(function (g) { g.salah(''); });
     tipe.salah('');
     nama.isian.value = rapiJudul_(nama.isian.value, false);
     const nilaiNama = nama.isian.value.trim();
@@ -4858,7 +4976,7 @@ function layarFormListing(isi, p) {
     if (jenis.nilai() === 'Lainnya' && !teksJenis) tandai(jenisTeks, 'Ketik jenis bangunannya.');
     const teksSert = rapiJudul_(sertTeks.isian.value, false);
     if (sert.nilai() === 'Lainnya' && !teksSert) tandai(sertTeks, 'Ketik jenis sertifikatnya.');
-    [lt, lb, lantai, kt, km].forEach(function (g) { if (!g.periksa()) pertama = pertama || g; });
+    [lt, lb, pj, le, lantai, kt, km].forEach(function (g) { if (!g.periksa()) pertama = pertama || g; });
     if (pertama) {
       if (pertama.fokus) pertama.fokus(); else pertama.isian.focus();
       umumkan('Ada isian yang perlu diperbaiki.');
@@ -4868,13 +4986,14 @@ function layarFormListing(isi, p) {
       mode: ubah ? 'ubah' : 'baru', id_listing: idListing, tipe: tipe.nilai(), nama: nilaiNama,
       jenis: !jenis.nilai() ? '' : jenis.nilai() === 'Lainnya' ? 'Lainnya: ' + teksJenis : jenis.nilai(),
       tawar: tawar.nilai() || '', lokasi: rapiJudul_(lokasi.isian.value, false),
-      luas_tanah: lt.nilai(), luas_bangunan: lb.nilai(), lantai: lantai.nilai(), kamar_tidur: kt.nilai(), kamar_mandi: km.nilai(),
+      luas_tanah: lt.nilai(), luas_bangunan: lb.nilai(), panjang_tanah: pj.nilai(), lebar_tanah: le.nilai(), lantai: lantai.nilai(), kamar_tidur: kt.nilai(), kamar_mandi: km.nilai(),
       sertifikat: !sert.nilai() ? '' : sert.nilai() === 'Lainnya' ? 'Lainnya: ' + teksSert : sert.nilai(),
       menghadap: hadap.nilai() || '', harga: harga.nilai(), nego: nego.nilai() || '',
       agen_nama: rapiNama_(agenNama.isian.value), agen_kantor: agenKantor.isian.value.trim(), agen_hp: hp,
       komisi_kesepakatan: komisi.isian.value.trim(), status: ubah ? (lama.status || 'Baru') : 'Baru',
-      catatan: rapiKalimat_(catatan.isian.value), teks_asli: teksAsli
+      catatan: rapiKalimat_(catatan.isian.value)
     };
+    if (!ubah) kirim.teks_asli = teksAsli;
     tombolSimpanSibuk(tombolSimpan, true);
     S.sibuk = true;
     try {
@@ -4915,6 +5034,7 @@ function layarDetailListing(isi, p) {
     el('p', { class: 'listing-harga', text: hargaListingTeks(l) }),
     spesifikasi ? el('p', { class: 'redup', text: spesifikasi }) : null,
     l.catatan ? el('p', { class: 'pre-line kecil', text: l.catatan }) : null,
+    el('p', { class: 'kecil' + (umurListingHari(l) >= 30 ? ' sub-lama' : ' redup'), text: teksUmurListing(l) + (umurListingHari(l) >= 30 && !listingSelesai(l) ? '. Hapus kalau sudah tidak berlaku.' : '') }),
     el('div', { class: 'baris-chip' }, chipNetral(l.tipe === 'dicari' ? (l.tawar === 'sewa' ? 'Cari sewa' : 'Cari beli') : (l.tawar === 'sewa' ? 'Disewakan' : 'Dijual')))));
 
   // Agen dan WhatsApp
@@ -4938,6 +5058,8 @@ function layarDetailListing(isi, p) {
       if (j.ok) {
         simpanKeDaftar(S.data.listing, 'id_listing', j.data.listing);
         l.status = j.data.listing.status;
+        pasangNav('listing');   // lencana mengikuti status terbaru
+        document.getElementById('navBawah').classList.remove('tersembunyi');
         umumkan('Status menjadi ' + baru);
         return;
       }
@@ -4990,11 +5112,14 @@ function layarDetailListing(isi, p) {
       h.mungkin.map(function (x) { return barisPropertiListing(x.pr, 'Mungkin · ' + x.alasan); })));
   }
 
-  if (l.teks_asli) {
-    isi.append(el('details', { class: 'lipat jarak-atas' },
+  const kotakAsli = el('div');
+  isi.append(kotakAsli);
+  panggil('ambilListing', { id_listing: l.id_listing }).then(function (j) {
+    if (!j.ok || !j.data.teks_asli || !kotakAsli.isConnected) return;
+    kotakAsli.append(el('details', { class: 'lipat jarak-atas' },
       el('summary', {}, ikon('pesan'), el('span', { class: 'tengah' }, el('span', { class: 'judul-lipat', text: 'Pesan asli' }), el('span', { class: 'sub-lipat', text: 'Ketuk untuk membaca' }))),
-      el('div', { class: 'lipat-isi' }, el('p', { class: 'pre-line kecil', text: l.teks_asli }))));
-  }
+      el('div', { class: 'lipat-isi' }, el('p', { class: 'pre-line kecil', text: j.data.teks_asli }))));
+  }).catch(function () { /* pesan asli hanya pelengkap */ });
 
   isi.append(el('div', { class: 'tumpuk jarak-atas' },
     tombol('tombol-kedua', 'pensil', 'Ubah listing', function () { buka('formListing', { mode: 'ubah', id: l.id_listing }); }),
@@ -5021,12 +5146,73 @@ function layarDetailListing(isi, p) {
 
 function barisKlienListing(k, sub) {
   return el('button', { type: 'button', class: 'baris', onclick: function () { buka('profil', { id: k.id_klien }); } },
-    avatar(k.nama), el('span', { class: 'tengah' }, el('span', { class: 'judul', text: k.nama }), el('span', { class: 'sub', text: sub })), ikon('kanan', 'panah'));
+    avatar(k.nama), el('span', { class: 'tengah' }, el('span', { class: 'judul', text: k.nama }), el('span', { class: 'sub', text: sub })), ikon('panah', 'panah'));
 }
 
 function barisPropertiListing(pr, sub) {
   return el('button', { type: 'button', class: 'baris', onclick: function () { buka('properti', { id: pr.id_properti }); } },
-    el('span', { class: 'tengah' }, el('span', { class: 'judul', text: pr.nama_properti }), el('span', { class: 'sub', text: sub + (pr.area ? ' · ' + pr.area : '') })), ikon('kanan', 'panah'));
+    el('span', { class: 'tengah' }, el('span', { class: 'judul', text: pr.nama_properti }), el('span', { class: 'sub', text: sub + (pr.area ? ' · ' + pr.area : '') })), ikon('panah', 'panah'));
+}
+
+
+/* ── Arsip (v5.1): data lama muncul di pencarian yang sama, diberi label Arsip ── */
+
+/** Gabungkan data arsip ke memori supaya bisa dibuka seperti data biasa. Hilang sendiri saat dimuat ulang. */
+function gabungArsip(d) {
+  [['klien', 'id_klien'], ['properti', 'id_properti'], ['dokumen', 'id_dokumen']].forEach(function (x) {
+    (d[x[0]] || []).forEach(function (o) {
+      if (S.data[x[0]].some(function (a) { return a[x[1]] === o[x[1]]; })) return;
+      o.arsip = true;
+      S.data[x[0]].push(o);
+    });
+  });
+}
+
+function chipArsip() { return el('span', { class: 'chip chip-arsip' }, ikon('arsip', 'ikon-mini'), 'Arsip'); }
+
+/** Cari juga di arsip. Hasil muncul di bawah hasil biasa, di layar dan kotak cari yang sama. */
+function cariDiArsip(induk, q, mode, saatAda) {
+  const nomor = (induk._arsipNo = (induk._arsipNo || 0) + 1);
+  clearTimeout(induk._arsipJeda);
+  const wadah = el('div', { class: 'arsip-hasil' });
+  induk.append(wadah);
+  if (!S.data.jumlahArsip || String(q).trim().length < 2) return;
+  wadah.append(el('p', { class: 'kecil redup jarak-atas-kecil', text: 'Mencari juga di arsip...' }));
+  induk._arsipJeda = setTimeout(async function () {
+    try {
+      const j = await panggil('cariArsip', { q: String(q).trim() });
+      if (induk._arsipNo !== nomor || !wadah.isConnected) return;
+      kosongkan(wadah);
+      if (!j.ok) { wadah.append(el('p', { class: 'kecil redup', text: 'Arsip belum bisa dicari sekarang.' })); return; }
+      const d = j.data;
+      const adaDi = function (daftar, kunci, id) { return daftar.some(function (x) { return x[kunci] === id && !x.arsip; }); };
+      const klien = d.klien.filter(function (k) { return d.ketemuKlien.indexOf(k.id_klien) >= 0 && !adaDi(S.data.klien, 'id_klien', k.id_klien); });
+      const properti = d.properti.filter(function (p) { return d.ketemuProperti.indexOf(p.id_properti) >= 0 && !adaDi(S.data.properti, 'id_properti', p.id_properti); });
+      if (!klien.length && !properti.length) return;
+      if (saatAda) saatAda();
+      wadah.append(judulBagian('Di arsip (' + (klien.length + properti.length) + ')'),
+        el('div', { class: 'daftar' },
+          klien.map(function (k) {
+            const n = d.properti.filter(function (p) { return p.id_klien === k.id_klien; }).length;
+            return el('button', { type: 'button', class: 'baris', onclick: function () { gabungArsip(d); pilihKlienDariCari(mode, cariKlien(k.id_klien)); } },
+              avatar(k.nama),
+              el('span', { class: 'tengah' }, el('span', { class: 'judul', text: k.nama }), el('span', { class: 'sub', text: k.peran + (k.peran === 'Penjual' ? ' · ' + n + ' properti' : '') }),
+                el('span', { class: 'baris-chip' }, chipArsip())),
+              ikon('kanan', 'panah'));
+          }),
+          properti.map(function (pr) {
+            return el('button', { type: 'button', class: 'baris', onclick: function () { gabungArsip(d); pilihPropertiDariCari(mode, cariProperti(pr.id_properti)); } },
+              el('span', { class: 'tengah' }, el('span', { class: 'judul', text: pr.nama_properti }), el('span', { class: 'sub', text: (pr.area || pr.alamat || namaJenis(pr.jenis)) }),
+                el('span', { class: 'baris-chip' }, chipArsip(), chip(progresProp(pr)))),
+              ikon('kanan', 'panah'));
+          })));
+      umumkan((klien.length + properti.length) + ' ditemukan di arsip.');
+    } catch (e) {
+      if (e instanceof GalatSesi || induk._arsipNo !== nomor || !wadah.isConnected) return;
+      kosongkan(wadah);
+      wadah.append(el('p', { class: 'kecil redup', text: 'Arsip belum bisa dicari. Periksa internet.' }));
+    }
+  }, 600);
 }
 
 /* ── Klien baru dan ubah klien ── */
