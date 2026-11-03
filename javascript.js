@@ -1314,7 +1314,7 @@ function terimaData(d) {
     return x.b.map(function (r) { const o = {}; for (let i = 0; i < x.k.length; i++) o[x.k[i]] = r[i]; return o; });
   };
   d.klien = bukaPak(d.klien); d.properti = bukaPak(d.properti); d.dokumen = bukaPak(d.dokumen); d.listing = bukaPak(d.listing);
-  S.msServer = d.ms || 0;
+  S.msServer = d.ms || 0; S.rinci = d.rinci || null;
   const isiSkema = function (daftar, kunci) {
     daftar = daftar || [];
     if (kunci && kunci.length) daftar.forEach(function (r) { for (let i = 0; i < kunci.length; i++) if (!(kunci[i] in r)) r[kunci[i]] = ''; });
@@ -2405,7 +2405,7 @@ function infoKecepatan() {
   const d = S.data;
   const angka = function (n) { return String(n).replace('.', ','); };
   return el('p', { class: 'kecil redup info-kecepatan', text: 'Data ' + angka((S.ukuranData / 1048576).toFixed(1)) + ' MB · dimuat ' + angka((S.waktuMuat / 1000).toFixed(1)) + ' detik · ' +
-    d.klien.length + ' klien, ' + d.properti.length + ' properti' + (S.msServer ? ' · server ' + angka((S.msServer / 1000).toFixed(1)) + ' detik' : '') + (d.jumlahArsip ? ' · ' + d.jumlahArsip + ' di arsip' : '') });
+    d.klien.length + ' klien, ' + d.properti.length + ' properti' + (S.msServer ? ' · server ' + angka((S.msServer / 1000).toFixed(1)) + ' detik' + (CONFIG.MODE === 'uji' && S.rinci ? ' (' + Object.keys(S.rinci).map(function (k) { return k + ' ' + S.rinci[k]; }).join(', ') + ' ms)' : '') : '') + (d.jumlahArsip ? ' · ' + d.jumlahArsip + ' di arsip' : '') });
 }
 
 function layarBeranda(isi) {
