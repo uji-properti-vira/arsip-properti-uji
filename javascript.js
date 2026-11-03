@@ -4258,6 +4258,8 @@ function pecahLokasi(t) {
     if (daftar[i][0].test(s)) { kota = daftar[i][1]; s = s.replace(daftar[i][0], ' '); }
   }
   if (!kota && /\btangerang\b/i.test(s) && /\b(cikupa|balaraja|cisauk|tigaraksa|curug|legok|panongan|jambe|kelapa dua|gading serpong|pagedangan)\b/i.test(s)) { kota = 'Kab. Tangerang'; s = s.replace(/\btangerang\b/i, ' '); }
+  if (!kota && /\b(?:gading serpong|summarecon serpong|paramount|scientia)\b/i.test(s)) kota = 'Kab. Tangerang';
+  if (!kota && /\b(?:pamulang|ciputat|serpong|bsd|pondok aren|alam sutera)\b/i.test(s)) kota = 'Tangerang Selatan';
   s = s.replace(/\b(?:di|lokasi|strategis|premium)\b/gi, ' ').replace(/\bjakarta\b\s*$/i, ' ');
   const area = s.replace(/[,;]+/g, ' ').replace(/\s+-\s+$|^\s+-\s+/g, ' ').replace(/\s+/g, ' ').replace(/^[\s-]+|[\s-]+$/g, '');
   return { lokasi: area && kota ? area + ', ' + kota : (kota || area), kota: !!kota };
@@ -4400,7 +4402,7 @@ function bacaListing(mentah) {
   m = /\bkt\s*\/\s*km\s*[:=]?\s*(\d+)\s*[\/+]\s*(\d+)/.exec(dasar) || /(\d+)\s*[\/+]\s*(\d+)\s*(?:kt\s*\/\s*km|k\.?t\s*\/\s*k\.?m)\b/.exec(dasar);
   if (m) { nilai.kamar_tidur = m[1]; nilai.kamar_mandi = m[2]; dasar = dasar.replace(m[0], ' '); }
   if (!nilai.kamar_tidur) {
-    m = /(?:\bkt\b|\bk\.t\.?|kamar tidur|kmr\.? ?tidur|bedrooms?|\bbr\b|\bbed\b)\s*[:=.\-]?\s*(\d+)(?:\s*\+\s*(\d+))?/.exec(dasar)
+    m = /(?:\bkt\b|\bk\.t\.?|kamar tidur|kmr\.? ?tidur|bedrooms?|\bbr\b|\bbed\b)[ \t]*[:=.\-]?[ \t]*(\d+)(?:\s*\+\s*(\d+))?/.exec(dasar)
       || /(\d+)(?:\s*\+\s*(\d+))?\s*(?:kt\b|kamar tidur|bedrooms?|\bbr\b|\bbed\b)/.exec(dasar);
     if (m) {
       nilai.kamar_tidur = m[1];
@@ -4409,7 +4411,7 @@ function bacaListing(mentah) {
     }
   }
   if (!nilai.kamar_mandi) {
-    const re1 = /(?:\bkm\b|\bk\.m\.?|kamar mandi|kmr\.? ?mandi|bathrooms?|\bbath\b)\s*[:=.\-]?\s*(\d+)(?:\s*\+\s*(\d+))?/g;
+    const re1 = /(?:\bkm\b|\bk\.m\.?|kamar mandi|kmr\.? ?mandi|bathrooms?|\bbath\b)[ \t]*[:=.\-]?[ \t]*(\d+)(?:\s*\+\s*(\d+))?/g;
     const re2 = /(\d+)(?:\s*\+\s*(\d+))?\s*(?:km\b|kamar mandi|kmr\.? ?mandi|bathrooms?|\bbath\b)/g;
     [re1, re2].some(function (re) {
       let x;
@@ -4505,7 +4507,9 @@ function bacaListing(mentah) {
     const b2 = awalUnit.test(b) ? b.replace(awalUnit, '') : b;
     if (b2 === b && (sapaan.test(b) || dataBaris.test(b))) continue;
     // baris semboyan ("DIJUAL RUGI", "BARANG LANGKA", "(dibawah hrg NJOP)") bukan judul
-    const sisa = b2.replace(awalanRe0, '').replace(/[\s!.:*-]+$/, '');
+    let sisa = b2;
+    for (let q = 0; q < 4; q++) sisa = sisa.replace(awalanRe0, '');
+    sisa = sisa.replace(/[\s!.:*-]+$/, '');
     if (!sisa || /^(\(|rugi\b|barang langka|murah|banting|cuan|siap huni$|bu\b)/i.test(sisa)) continue;
     judul = b2;
     judulAsli = b2;
@@ -4526,8 +4530,12 @@ function bacaListing(mentah) {
   m = /(?:lokasi|alamat|area|loc|location|daerah)\s*[:=\-]\s*([^\n◆]{3,100})/i.exec(semua);
   if (m) nilai.lokasi = m[1].replace(/[\s.,;]+$/, '').trim();
   else if (judul) {
+    // "Rumah di NAMA PERUMAHAN, Daerah - Daerah, dekat ...": daerahnya ada setelah koma pertama
+    const dk = /\bdi\s+[^,\n]+,\s*([A-Za-z][A-Za-z .]{2,30}?)(?:\s+-\s+[A-Za-z .]+?)?\s*(?=,|\bdekat\b|$)/i.exec(judulAsli);
+    if (dk && pecahLokasi(dk[1]).kota) nilai.lokasi = dk[1].trim();
     const d = /\b(?:di|daerah|area)\s+([A-Za-z][A-Za-z .]{2,40}?)(?=\s+\d|\s+(?:budget|bud|max|maks|harga|lt|lb|kt|km|shm|hgb|br)\b|[,;]|$)/i.exec(judul);
-    if (d) nilai.lokasi = d[1].trim();
+    if (nilai.lokasi) { /* sudah dari daerah setelah koma */ }
+    else if (d) nilai.lokasi = d[1].trim();
     else {
       const d2 = /\b(?:di|daerah)\s+([A-Za-z][A-Za-z ]{2,40}?)(?=\s+(?:budget|bud|max|maks|harga|lt|lb|kt|km|shm|hgb)\b|[,.]|$)/i.exec(semua.split('\n').find(function (b) { return /\bdi\s+[A-Za-z]/i.test(b); }) || '');
       if (d2) nilai.lokasi = d2[1].trim();
