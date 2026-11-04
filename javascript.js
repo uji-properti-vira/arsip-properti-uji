@@ -900,6 +900,8 @@ function bersihkanSemua(buangDiHp) {
   if (S.tutupDialog) S.tutupDialog(null);
   S.tiket = null;
   S.data = null;
+  S.drive = null;
+  try { localStorage.removeItem('ap_drive'); } catch (e) { /* abaikan */ }
   S.baruDibuka = [];
   lepasFoto();
   S.sibuk = false;
@@ -2643,13 +2645,13 @@ function infoKecepatan() {
 /** Kartu ruang Drive (lingkaran persen). Muncul di atas Beranda; kata-katanya dibuat tenang, tidak menakutkan. */
 function kartuDrive(pakai, batas) {
   const p = Math.min(100, Math.round(pakai / batas * 100));
-  const gb = function (b) { return (b / 1073741824).toFixed(1).replace(/\.0$/, '').replace('.', ','); };
+  const gb = function (b) { return b >= 1099511627776 ? (b / 1099511627776).toFixed(1).replace(/\.0$/, '').replace('.', ',') + ' TB' : (b / 1073741824).toFixed(1).replace(/\.0$/, '').replace('.', ',') + ' GB'; };
   const sisa = Math.max(0, batas - pakai);
   const tingkat = p >= 95 ? 'penuh' : p >= 80 ? 'terisi' : 'lega';
   const judul = tingkat === 'penuh' ? 'Ruang Drive hampir penuh' : tingkat === 'terisi' ? 'Ruang Drive mulai terisi' : 'Ruang Drive';
-  const isiTeks = tingkat === 'penuh' ? 'Sisa ' + gb(sisa) + ' GB. Mohon dirapikan agar foto baru tetap bisa disimpan.'
-    : tingkat === 'terisi' ? 'Sisa ' + gb(sisa) + ' GB. Boleh dirapikan pelan-pelan.'
-    : gb(pakai) + ' GB dari ' + gb(batas) + ' GB terpakai';
+  const isiTeks = tingkat === 'penuh' ? 'Sisa ' + gb(sisa) + '. Mohon dirapikan agar foto baru tetap bisa disimpan.'
+    : tingkat === 'terisi' ? 'Sisa ' + gb(sisa) + '. Boleh dirapikan pelan-pelan.'
+    : gb(pakai) + ' dari ' + gb(batas) + ' terpakai';
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', '0 0 72 72');
@@ -2675,10 +2677,18 @@ function muatKartuDrive(wadah, st) {
     kosongkan(wadah);
     wadah.append(kartuDrive(d.pakai, d.batas));
   };
-  if (S.drive && Date.now() - S.drive.waktu < 600000) { pasang(S.drive); return; }
+  // Angka terakhir disimpan di HP (hanya ukuran ruang, tidak sensitif; dibuang saat Keluar) supaya kartu langsung tampil
+  // setelah refresh, tanpa menunggu server dan tanpa membuat layar bergeser.
+  if (!S.drive) {
+    try { const t = JSON.parse(localStorage.getItem('ap_drive') || 'null'); if (t && t.batas > 0) S.drive = t; } catch (e) { /* abaikan */ }
+  }
+  if (S.drive) pasang(S.drive);
+  if (S.drive && Date.now() - S.drive.waktu < 600000) return;
   panggil('ruangDrive', {}).then(function (j) {
     if (!j.ok) return;
     S.drive = { pakai: j.data.pakai, batas: j.data.batas, waktu: Date.now() };
+    try { localStorage.setItem('ap_drive', JSON.stringify(S.drive)); } catch (e) { /* abaikan */ }
+    kosongkan(wadah);
     pasang(S.drive);
   }).catch(function () { /* kartu hanya pelengkap */ });
 }
