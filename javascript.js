@@ -1,7 +1,7 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
-   Versi 5.1 — 2 November 2026. Butuh Code.gs 2.6. Baru: data lama (arsip) tetap muncul di pencarian dengan label Arsip;
+   Versi 5.3 — 4 November 2026. Butuh Code.gs 2.9. Baru: gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
    daftar panjang tampil bertahap saat digulir; Listing punya panjang x lebar, keterangan tambahan masuk ke catatan,
    umur listing; baris kecil di Beranda yang menunjukkan ukuran dan lama muat data.
    Versi 5.0 — 2 November 2026. Butuh Code.gs 2.5. Baru: menu Listing untuk info properti dari grup WhatsApp agen lain
@@ -92,8 +92,9 @@ const CONFIG = {
   BATAS_BUDGET_ALT: 0.60,     // 30% sampai 60% di atas budget = "alternatif"
   MARKA_TEKS: 'Pudji',        // tulisan di bawah logo watermark foto properti
   NO_HP_PEMILIK: '0813 8279 9845',   // kaki gambar promo dan isian Nama dan HP agen
+  NAMA_BANNER: 'PUJI TAN',           // nama di strip Gaya Banner Gading Pro (QR qr-wa.png dibuat dari nomor ini)
   FOTO_PER_HALAMAN: 6,        // foto per halaman di layar Bagikan (2 kolom x 3 baris)
-  VERSI_SERVER_MIN: '2.7'     // versi Code.gs yang dibutuhkan tampilan ini
+  VERSI_SERVER_MIN: '2.9'     // versi Code.gs yang dibutuhkan tampilan ini
 };
 
 /* ── Daftar tetap ─────────────────────────────────────────── */
@@ -1561,6 +1562,7 @@ function tulisanMuat(c, teks, px, bobot, lebar) {
  * pilih = { harga, spek, agen } menentukan tulisan yang tampil. Hasil: Blob JPEG.
  */
 async function buatGambarPromo(pr, idFoto, pilih) {
+  if (pilih.gaya === 'banner') return buatGambarBanner(pr, idFoto, pilih);
   const W = PROMO_W, H = PROMO_H;
   const kanvas = document.createElement('canvas');
   kanvas.width = W;
@@ -1675,6 +1677,168 @@ async function buatGambarPromo(pr, idFoto, pilih) {
   return blob;
 }
 
+const ASET = {};
+function muatAset(nama) {
+  if (!ASET[nama]) {
+    ASET[nama] = new Promise(function (ok, gagal) {
+      const g = new Image();
+      g.onload = function () { ok(g); };
+      g.onerror = function () { ASET[nama] = null; gagal(new Error(nama)); };
+      g.src = nama;
+    });
+  }
+  return ASET[nama];
+}
+
+function gayaPromoAwal() {
+  try { return localStorage.getItem('gayaPromo') === 'banner' ? 'banner' : 'watermark'; } catch (e) { return 'watermark'; }
+}
+
+/** Gaya "Banner Gading Pro": foto di atas, strip banner di bawah (harga, hubungi, QR WhatsApp). Hasil: Blob JPEG 1080 x 1350. */
+async function buatGambarBanner(pr, idFoto, pilih) {
+  const W = PROMO_W, H = PROMO_H;
+  const NAVY = '#1D3A8A', GELAP = '#12256A', ORANYE = '#F7943A';
+  const F = ' "Segoe UI", Roboto, Arial, sans-serif';
+  const kanvas = document.createElement('canvas');
+  kanvas.width = W;
+  kanvas.height = H;
+  const c = kanvas.getContext('2d');
+  c.fillStyle = '#FFFFFF';
+  c.fillRect(0, 0, W, H);
+  const yHub = H - 60 - 250;   // strip hubungi: dari sini sampai kaki oranye
+  // Tinggi foto menyesuaikan banyaknya tulisan di bawahnya, supaya tidak bertabrakan dengan strip hubungi.
+  const harga = pasanganHargaPromo(pr);
+  const adaPromo = !!(pilih.harga && harga && harga.promo > 0 && harga.promo < harga.normal);
+  const barisSpek = pilih.spek ? spekPromo(pr) : [];
+  const area = areaPromo(pr);
+  const butuh = 82 + (area ? 50 : 0) + (pilih.harga && harga ? (adaPromo ? 52 : 0) + 98 : 0) + (barisSpek.length ? 22 + 44 * barisSpek.length : 0) + 28;
+  const yFoto = Math.max(440, Math.min(pilih.agen ? 760 : 940, (pilih.agen ? yHub : H - 60) - butuh));
+
+  const x = await ambilFotoBesar(idFoto, 'bagikan');
+  const img = new Image();
+  img.src = x.url;
+  await img.decode();
+  const s = Math.max(W / img.naturalWidth, yFoto / img.naturalHeight);
+  const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+  c.save();
+  c.beginPath();
+  c.rect(0, 0, W, yFoto);
+  c.clip();
+  c.drawImage(img, (W - dw) / 2, (yFoto - dh) / 2, dw, dh);
+  c.restore();
+
+  try { const lg = await muatAset('logo-banner.png'); c.drawImage(lg, 0, 0, 300, 150); } catch (e) { /* logo tidak termuat: gambar tetap dibuat */ }
+
+  // Kanan atas: DIJUAL / DISEWAKAN, BU, HEMAT
+  const lencana = [{ teks: pr.dijual && pr.disewakan ? 'DIJUAL / DISEWAKAN' : pr.disewakan ? 'DISEWAKAN' : 'DIJUAL', latar: ORANYE, warna: '#FFFFFF' }];
+  if (adaBU(pr)) lencana.push({ teks: 'BU', latar: '#2E7D5B', warna: '#FFFFFF' });
+  if (harga && harga.promo > 0 && harga.promo < harga.normal) lencana.push({ teks: 'HEMAT ' + hargaPromo(harga.normal - harga.promo), latar: '#F2B33D', warna: '#3A2400' });
+  let yl = 36;
+  lencana.forEach(function (l) {
+    c.font = '800 40px' + F;
+    const w = c.measureText(l.teks).width + 52;
+    const xl = W - 36 - w;
+    c.fillStyle = l.latar;
+    garisBundar(c, xl, yl, w, 76, 38);
+    c.fill();
+    c.fillStyle = l.warna;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(l.teks, xl + w / 2, yl + 39);
+    yl += 76 + 14;
+  });
+
+  // Nama, area, harga, spesifikasi
+  c.textAlign = 'left';
+  c.textBaseline = 'alphabetic';
+  let y = yFoto + 82;
+  c.fillStyle = NAVY;
+  const nama = pr.nama_properti || 'Properti';
+  tulisanMuat(c, nama, 64, '800', W - 96);
+  c.fillText(nama, 48, y);
+  if (area) {
+    c.fillStyle = '#3A3A3A';
+    tulisanMuat(c, area, 34, '600', W - 96);
+    c.fillText(area, 48, y + 50);
+    y += 50;
+  }
+  if (pilih.harga && harga) {
+    if (adaPromo) {
+      const tn = hargaPromo(harga.normal) + harga.akhiran;
+      c.font = '600 36px' + F;
+      c.fillStyle = '#6B6B6B';
+      c.fillText(tn, 48, y + 52);
+      c.fillRect(44, y + 40, c.measureText(tn).width + 8, 4);
+      y += 52;
+    }
+    const tp = hargaPromo(adaPromo ? harga.promo : harga.normal) + harga.akhiran;
+    c.fillStyle = NAVY;
+    tulisanMuat(c, tp, 92, '800', W - 96);
+    c.fillText(tp, 48, y + 98);
+    y += 98;
+  }
+  if (barisSpek.length) {
+    c.fillStyle = '#3A3A3A';
+    barisSpek.forEach(function (baris, i) {
+      tulisanMuat(c, baris, 32, '600', W - 96);
+      c.fillText(baris, 48, y + 52 + i * 44);
+    });
+  }
+
+  // Strip hubungi: nama, nomor, QR WhatsApp
+  if (pilih.agen) {
+    c.fillStyle = GELAP;
+    c.font = '700 26px' + F;
+    c.textAlign = 'left';
+    c.fillText('HUBUNGI :', 48, yHub + 34);
+    c.fillStyle = NAVY;
+    c.fillRect(0, yHub + 48, 770, 84);
+    c.fillStyle = '#FFFFFF';
+    c.textAlign = 'center';
+    const nm = String(CONFIG.NAMA_BANNER || CONFIG.NAMA_PEMILIK || '').toUpperCase();
+    tulisanMuat(c, nm, 62, '800', 700);
+    c.fillText(nm, 385, yHub + 48 + 62);
+    c.fillStyle = GELAP;
+    tulisanMuat(c, CONFIG.NO_HP_PEMILIK, 108, '800', 740);
+    c.fillText(CONFIG.NO_HP_PEMILIK, 385, yHub + 232);
+    try {
+      const qr = await muatAset('qr-wa.png');
+      c.fillStyle = ORANYE;
+      garisBundar(c, 810, yHub + 10, 232, 232, 24);
+      c.fill();
+      c.fillStyle = '#FFFFFF';
+      c.font = '800 25px' + F;
+      c.fillText('SCAN ME', 926, yHub + 44);
+      garisBundar(c, 830, yHub + 58, 192, 172, 10);
+      c.fill();
+      c.drawImage(qr, 842, yHub + 62, 168, 168);
+    } catch (e) { /* QR tidak termuat: gambar tetap dibuat tanpa QR */ }
+  }
+
+  // Kaki
+  c.fillStyle = ORANYE;
+  c.fillRect(0, H - 60, W, 60);
+  c.fillStyle = GELAP;
+  c.fillRect(520, H - 60, W - 520, 60);
+  c.fillStyle = '#FFFFFF';
+  c.textAlign = 'left';
+  tulisanMuat(c, 'JUAL • BELI • SEWA • PROPERTI', 27, '800', 470);
+  c.fillText('JUAL • BELI • SEWA • PROPERTI', 36, H - 21);
+  c.textAlign = 'center';
+  const sosial = 'gadingproofficial · gadingpro · www.gadingpro.com';
+  let fs = 22;
+  c.font = '600 ' + fs + 'px' + F;
+  while (c.measureText(sosial).width > W - 520 - 28 && fs > 12) { fs -= 1; c.font = '600 ' + fs + 'px' + F; }
+  c.fillText(sosial, (520 + W) / 2, H - 22);
+
+  const blob = await new Promise(function (ok, gagal) {
+    kanvas.toBlob(function (b) { if (b) ok(b); else gagal(new Error('toBlob')); }, 'image/jpeg', 0.92);
+  });
+  kanvas.width = 0;
+  kanvas.height = 0;
+  return blob;
+}
+
 function garisBundar(c, x, y, w, h, r) {
   c.beginPath();
   if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h);
@@ -1691,7 +1855,7 @@ function layarPromo(isi, p) {
   const fotos = fotoProperti(pr);
   const dipilih = {};
   if (fotos[0]) dipilih[fotos[0].id_dokumen] = true;
-  const pilih = { harga: true, spek: true, agen: true };
+  const pilih = { harga: true, spek: true, agen: true, gaya: gayaPromoAwal() };
   let hasil = [];          // { nama, blob, url }
   let nomor = 0;
 
@@ -1718,6 +1882,11 @@ function layarPromo(isi, p) {
   isi.append(
     el('div', { class: 'bidang' }, el('span', { class: 'label', text: 'Foto yang diberi tulisan' }), el('span', { class: 'keterangan', text: 'Boleh lebih dari satu. Tiap foto jadi satu gambar.' })),
     fotos.length ? kisiFoto : el('p', { class: 'kecil redup', text: 'Belum ada foto properti. Tambahkan foto dulu.' }),
+    el('div', { class: 'jarak-atas' }, grupPilihan('Gaya gambar', '', [{ nilai: 'watermark', label: 'Watermark' }, { nilai: 'banner', label: 'Banner Gading Pro' }], pilih.gaya, function (g) {
+      pilih.gaya = g;
+      try { localStorage.setItem('gayaPromo', g); } catch (e) { /* tidak apa-apa */ }
+      segarkan();
+    }).wadah),
     el('div', { class: 'bidang jarak-atas' }, el('span', { class: 'label', text: 'Tulisan yang tampil' }), tandaHarga, tandaSpek, tandaAgen),
     catatan, wadahHasil,
     el('div', { class: 'tumpuk jarak-atas' }, tombolBagi, tombolUnduh));
@@ -4930,10 +5099,200 @@ function kartuListingCocok(k) {
   return kotak;
 }
 
+/* ── Gambar promo listing (dari agen lain; dipakai apa adanya, tanpa watermark) ── */
+
+const GAMBAR_LISTING_MAKS = 3;
+const MINI_LISTING = {};            // kode listing -> gambar kecil (data:...) untuk kartu
+const ANTRE_MINI_LST = { ids: [], pasang: {}, jadwal: 0 };
+
+function jumlahGambarListing(l) { return Number(l.gambar_n) || 0; }
+
+function isiMini(wadah, src) {
+  wadah.style.backgroundImage = 'url("' + src + '")';
+  wadah.classList.add('siap');
+}
+
+/** Kotak gambar kecil di atas kartu; gambarnya diminta ke server berkelompok, tidak satu per satu. */
+function wadahMiniListing(l) {
+  const n = jumlahGambarListing(l);
+  if (!n) return null;
+  const w = el('span', { class: 'listing-mini', 'aria-hidden': 'true' },
+    n > 1 ? el('span', { class: 'listing-mini-n' }, ikon('gambar', 'ikon-mini'), el('span', { text: String(n) })) : null);
+  if (MINI_LISTING[l.id_listing]) { isiMini(w, MINI_LISTING[l.id_listing]); return w; }
+  (ANTRE_MINI_LST.pasang[l.id_listing] = ANTRE_MINI_LST.pasang[l.id_listing] || []).push(w);
+  if (ANTRE_MINI_LST.ids.indexOf(l.id_listing) < 0) ANTRE_MINI_LST.ids.push(l.id_listing);
+  clearTimeout(ANTRE_MINI_LST.jadwal);
+  ANTRE_MINI_LST.jadwal = setTimeout(jalankanAntreMini, 150);
+  return w;
+}
+
+async function jalankanAntreMini() {
+  while (ANTRE_MINI_LST.ids.length) {
+    const ids = ANTRE_MINI_LST.ids.splice(0, 24);
+    let hasil = {};
+    try {
+      const j = await panggil('ambilMiniListing', { ids: ids });
+      if (j.ok) hasil = j.data.mini || {};
+    } catch (e) { /* kartu tetap tampil tanpa gambar */ }
+    ids.forEach(function (id) {
+      const m = hasil[id];
+      if (m) MINI_LISTING[id] = 'data:' + m.mime + ';base64,' + m.gambar;
+      (ANTRE_MINI_LST.pasang[id] || []).forEach(function (w) { if (m) isiMini(w, MINI_LISTING[id]); else w.remove(); });
+      delete ANTRE_MINI_LST.pasang[id];
+    });
+  }
+}
+
+function lihatGambarBesar(src) {
+  const tekan = function (e) { if (e.key === 'Escape') tutup(); };
+  const tutup = function () { lapis.remove(); document.removeEventListener('keydown', tekan); };
+  const lapis = el('div', { class: 'lihat-gambar', role: 'dialog', 'aria-label': 'Gambar besar', onclick: tutup },
+    el('img', { src: src, alt: 'Gambar promo' }),
+    el('button', { type: 'button', class: 'lihat-gambar-tutup', 'aria-label': 'Tutup', onclick: tutup }, ikon('silang')));
+  document.addEventListener('keydown', tekan);
+  document.body.append(lapis);
+}
+
+/** Bagian "Gambar dari agen" di rincian listing: lihat, tambah, hapus, bagikan. */
+function bagianGambarListing(l, wb) {
+  const wadah = el('div', { class: 'gambar-listing' });
+  const st = S.layar;
+  let blobs = [];
+  const jumlah = function () { return jumlahGambarListing(l); };
+  const catatJumlah = function (n) {
+    l.gambar_n = n || '';
+    const d = cariListing(l.id_listing);
+    if (d) d.gambar_n = n || '';
+    delete MINI_LISTING[l.id_listing];
+  };
+  const unduhSemua = function (files) {
+    files.forEach(function (f, i) {
+      setTimeout(function () {
+        const a = el('a', { href: URL.createObjectURL(f), download: f.name });
+        document.body.append(a);
+        a.click();
+        a.remove();
+      }, i * 400);
+    });
+  };
+
+  function gambarUlang() {
+    kosongkan(wadah);
+    blobs = [];
+    const n = jumlah();
+    const kisi = el('div', { class: 'gambar-kisi' + (n ? '' : ' tersembunyi') });
+    const kotak = [];
+    for (let i = 0; i < n; i++) {
+      const img = el('img', { alt: 'Gambar promo ' + (i + 1) });
+      const k = el('div', { class: 'gambar-kotak' }, img,
+        el('button', { type: 'button', class: 'gambar-hapus', 'aria-label': 'Hapus gambar ' + (i + 1), onclick: function () { hapus(i); } }, ikon('silang', 'ikon-mini')));
+      kotak.push({ k: k, img: img });
+      kisi.append(k);
+    }
+    const masukan = el('input', { type: 'file', accept: 'image/*', multiple: true, class: 'tersembunyi', tabindex: '-1', 'aria-hidden': 'true' });
+    masukan.addEventListener('change', function () { tambah(masukan.files); });
+    const tombolTambah = n < GAMBAR_LISTING_MAKS ? el('button', { type: 'button', class: 'tambah-gambar', onclick: function () { masukan.value = ''; masukan.click(); } },
+      el('span', { class: 'tambah-gambar-ikon' }, ikon('gambar')),
+      el('span', { class: 'tengah' }, el('span', { class: 'tambah-gambar-judul', text: 'Tambah gambar' }), el('span', { class: 'tambah-gambar-sub', text: 'Pilih dari galeri · maksimal ' + GAMBAR_LISTING_MAKS }))) : null;
+    const tombolBagi = n ? tombol('tombol-kedua', 'bagikan', 'Bagikan gambar', function () { bagikan(tombolBagi); }) : null;
+    wadah.append(kisi);
+    if (tombolTambah) wadah.append(tombolTambah);
+    if (tombolBagi) wadah.append(tombolBagi);
+    wadah.append(masukan);
+
+    (async function () {
+      for (let i = 0; i < n; i++) {
+        try {
+          const j = await panggil('ambilGambarListing', { id_listing: l.id_listing, nomor: i });
+          if (S.layar !== st) return;
+          if (j.ok) {
+            const b = base64KeBlob(j.data.gambar, 'image/jpeg');
+            blobs[i] = b;
+            const u = URL.createObjectURL(b);
+            kotak[i].img.src = u;
+            kotak[i].img.onclick = function () { lihatGambarBesar(u); };
+            kotak[i].k.classList.add('siap');
+          } else kotak[i].k.classList.add('galat');
+        } catch (e) {
+          if (e instanceof GalatSesi) return;
+          if (kotak[i]) kotak[i].k.classList.add('galat');
+        }
+      }
+    })();
+  }
+
+  async function tambah(daftarFile) {
+    const file = Array.prototype.slice.call(daftarFile || []).slice(0, GAMBAR_LISTING_MAKS - jumlah());
+    if (!file.length) return;
+    S.sibuk = true;
+    tampilMemuat('Menyiapkan gambar...');
+    let gagal = 0;
+    try {
+      for (let i = 0; i < file.length; i++) {
+        ubahTeksMemuat('Mengunggah gambar ' + (i + 1) + ' dari ' + file.length + '...');
+        try {
+          const h = await kecilkanGambar(file[i], CONFIG.FOTO_SISI_MAKS, 0.82);
+          const j = await panggil('unggahGambarListing', { id_listing: l.id_listing, nomor: jumlah(), gambar: await blobKeBase64(h.blob) });
+          if (j.ok) catatJumlah(j.data.gambar_n); else gagal++;
+        } catch (e) {
+          if (e instanceof GalatSesi) throw e;
+          gagal++;
+        }
+      }
+    } catch (e) { tutupMemuat(); S.sibuk = false; return; }
+    tutupMemuat();
+    S.sibuk = false;
+    if (S.layar !== st) return;
+    gambarUlang();
+    if (gagal) tampilBanner(wb, { jenis: 'waspada', judul: gagal + ' gambar belum terunggah', pesan: 'Periksa internet, lalu coba lagi.' });
+  }
+
+  async function hapus(i) {
+    if (!(await konfirmasi('Hapus gambar ini?', 'Gambar dihapus dari listing ini dan tidak bisa dikembalikan.', 'Ya, hapus', 'tombol-bahaya-penuh'))) return;
+    S.sibuk = true;
+    tampilMemuat('Menghapus gambar...');
+    try {
+      const j = await panggil('hapusGambarListing', { id_listing: l.id_listing, nomor: i });
+      tutupMemuat();
+      S.sibuk = false;
+      if (S.layar !== st) return;
+      if (j.ok) { catatJumlah(j.data.gambar_n); gambarUlang(); return; }
+      tampilBanner(wb, { jenis: 'gagal', judul: 'Gambar belum terhapus', pesan: j.pesan });
+    } catch (e) {
+      tutupMemuat();
+      S.sibuk = false;
+      if (e instanceof GalatSesi) return;
+      tampilBanner(wb, { jenis: 'waspada', judul: 'Hasil belum pasti', pesan: 'Koneksi terputus. Periksa internet, lalu lihat lagi daftar gambarnya.' });
+    }
+  }
+
+  async function bagikan(t) {
+    const ada = blobs.filter(Boolean);
+    if (!ada.length) { umumkan('Gambar belum selesai dimuat.'); return; }
+    const dasar = (l.nama || 'Listing').replace(/[^\w\- ]+/g, '').trim();
+    const files = ada.map(function (b, i) { return new File([b], dasar + ' ' + (i + 1) + '.jpg', { type: 'image/jpeg' }); });
+    if (!(navigator.canShare && navigator.canShare({ files: files }))) { unduhSemua(files); return; }
+    t.disabled = true;
+    t.querySelector('span').textContent = 'Membuka menu...';
+    try {
+      await navigator.share({ files: files });
+    } catch (e) {
+      if (!e || e.name !== 'AbortError') unduhSemua(files);
+    } finally {
+      t.disabled = false;
+      t.querySelector('span').textContent = 'Bagikan gambar';
+    }
+  }
+
+  gambarUlang();
+  return wadah;
+}
+
 function kartuListing(l) {
   const spesifikasi = ringkasListing(l);
   const cocok = chipCocokListing(l);
   return el('button', { type: 'button', class: 'kartu kartu-listing', onclick: function () { buka('detailListing', { id: l.id_listing }); } },
+    wadahMiniListing(l),
     el('span', { class: 'listing-judul', text: l.nama }),
     l.lokasi ? el('span', { class: 'sub', text: l.lokasi }) : null,
     spesifikasi ? el('span', { class: 'sub', text: spesifikasi }) : null,
@@ -5069,6 +5428,43 @@ function layarFormListing(isi, p) {
   const catatan = bidangTeks('fLCatatan', 'Catatan', 'Boleh kosong', v.catatan, { maxlength: '1000' }, true);
   pasangRapi(catatan.isian, rapiKalimat_);
 
+  // Gambar promo dari agen: hanya untuk listing baru; yang sudah ada diatur dari rincian listing.
+  const gambarBaru = [];
+  let blokGambar = null;
+  if (!ubah) {
+    const kisiGambar = el('div', { class: 'gambar-kisi tersembunyi' });
+    const masukan = el('input', { type: 'file', accept: 'image/*', multiple: true, class: 'tersembunyi', tabindex: '-1', 'aria-hidden': 'true' });
+    const tombolTambah = el('button', { type: 'button', class: 'tambah-gambar', onclick: function () { masukan.value = ''; masukan.click(); } },
+      el('span', { class: 'tambah-gambar-ikon' }, ikon('gambar')),
+      el('span', { class: 'tengah' }, el('span', { class: 'tambah-gambar-judul', text: 'Tambah gambar' }), el('span', { class: 'tambah-gambar-sub', text: 'Pilih dari galeri · maksimal ' + GAMBAR_LISTING_MAKS })));
+    const gambarUlangForm = function () {
+      kosongkan(kisiGambar);
+      gambarBaru.forEach(function (g, i) {
+        kisiGambar.append(el('div', { class: 'gambar-kotak siap' }, el('img', { src: g.url, alt: 'Gambar ' + (i + 1) }),
+          el('button', { type: 'button', class: 'gambar-hapus', 'aria-label': 'Buang gambar ' + (i + 1), onclick: function () { URL.revokeObjectURL(g.url); gambarBaru.splice(i, 1); gambarUlangForm(); } }, ikon('silang', 'ikon-mini'))));
+      });
+      kisiGambar.classList.toggle('tersembunyi', !gambarBaru.length);
+      tombolTambah.classList.toggle('tersembunyi', gambarBaru.length >= GAMBAR_LISTING_MAKS);
+    };
+    masukan.addEventListener('change', async function () {
+      const file = Array.prototype.slice.call(masukan.files || []).slice(0, GAMBAR_LISTING_MAKS - gambarBaru.length);
+      masukan.value = '';
+      let gagal = 0;
+      for (let i = 0; i < file.length; i++) {
+        try {
+          const h = await kecilkanGambar(file[i], CONFIG.FOTO_SISI_MAKS, 0.82);
+          gambarBaru.push({ blob: h.blob, url: URL.createObjectURL(h.blob) });
+        } catch (e) { gagal++; }
+      }
+      gambarUlangForm();
+      if (gagal) umumkan(gagal + ' gambar tidak bisa dibaca dan dilewati.');
+    });
+    blokGambar = el('div', { class: 'bidang' },
+      el('span', { class: 'label', text: 'Gambar promo dari agen' }),
+      el('span', { class: 'keterangan', text: 'Boleh kosong. Dipakai apa adanya, tanpa watermark.' }),
+      tombolTambah, kisiGambar, masukan);
+  }
+
   const tombolSimpan = tombol('tombol-utama', 'centang', 'Simpan listing', function () { simpan(); });
   isi.append(tipe.wadah, nama.wadah, jenis.wadah, jenisTeks.wadah, tawar.wadah, lokasi.wadah, harga.wadah, nego.wadah,
     el('div', { class: 'baris-2' }, lt.wadah, lb.wadah),
@@ -5077,12 +5473,37 @@ function layarFormListing(isi, p) {
     sert.wadah, sertTeks.wadah, hadap.wadah,
     judulBagian('Agen yang memposting'), agenNama.wadah, agenKantor.wadah, agenHp.wadah,
     judulBagian('Komisi'), komisi.wadah, catatan.wadah);
+  if (blokGambar) isi.append(blokGambar);
   if (teksAsli) {
     isi.append(el('details', { class: 'lipat' },
       el('summary', {}, ikon('pesan'), el('span', { class: 'tengah' }, el('span', { class: 'judul-lipat', text: 'Pesan asli' }), el('span', { class: 'sub-lipat', text: 'Ketuk untuk membandingkan' }))),
       el('div', { class: 'lipat-isi' }, el('p', { class: 'pre-line kecil', text: teksAsli }))));
   }
   isi.append(tombolSimpan);
+
+  /** Mengunggah gambar yang dipilih sesudah listing tersimpan. Hasil: jumlah gambar yang gagal. */
+  async function unggahGambarBaru() {
+    let gagal = 0, terunggah = 0;
+    tampilMemuat('Mengunggah gambar...');
+    try {
+      for (let i = 0; i < gambarBaru.length; i++) {
+        ubahTeksMemuat('Mengunggah gambar ' + (i + 1) + ' dari ' + gambarBaru.length + '...');
+        try {
+          const j = await panggil('unggahGambarListing', { id_listing: idListing, nomor: terunggah, gambar: await blobKeBase64(gambarBaru[i].blob) });
+          if (j.ok) {
+            terunggah = j.data.gambar_n;
+            const d = cariListing(idListing);
+            if (d) d.gambar_n = terunggah;
+          } else gagal++;
+        } catch (e) {
+          if (e instanceof GalatSesi) throw e;
+          gagal++;
+        }
+      }
+    } finally { tutupMemuat(); }
+    gambarBaru.forEach(function (g) { URL.revokeObjectURL(g.url); });
+    return gagal;
+  }
 
   async function simpan() {
     [nama, agenHp, jenisTeks, sertTeks, lt, lb, pj, le, lantai, kt, km].forEach(function (g) { g.salah(''); });
@@ -5121,11 +5542,17 @@ function layarFormListing(isi, p) {
     S.sibuk = true;
     try {
       const j = await panggil('simpanListing', kirim);
-      S.sibuk = false;
       if (j.ok) {
         S.data.listing = S.data.listing || [];
         simpanKeDaftar(S.data.listing, 'id_listing', j.data.listing);
-        S.bannerBerikut = { jenis: 'sukses', judul: ubah ? 'Perubahan tersimpan' : 'Listing tersimpan', pesan: j.data.listing.nama };
+      }
+      let gagalGambar = 0;
+      if (j.ok && !ubah && gambarBaru.length) gagalGambar = await unggahGambarBaru();
+      S.sibuk = false;
+      if (j.ok) {
+        S.bannerBerikut = gagalGambar
+          ? { jenis: 'waspada', judul: 'Listing tersimpan', pesan: gagalGambar + ' gambar belum terunggah. Tambahkan lagi dari rincian listing.' }
+          : { jenis: 'sukses', judul: ubah ? 'Perubahan tersimpan' : 'Listing tersimpan', pesan: j.data.listing.nama };
         if (ubah) history.back();
         else buka('detailListing', { id: idListing }, { ganti: true });
         return;
@@ -5159,6 +5586,8 @@ function layarDetailListing(isi, p) {
     l.catatan ? el('p', { class: 'pre-line kecil', text: l.catatan }) : null,
     el('p', { class: 'kecil' + (umurListingHari(l) >= 30 ? ' sub-lama' : ' redup'), text: teksUmurListing(l) + (umurListingHari(l) >= 30 && !listingSelesai(l) ? '. Hapus kalau sudah tidak berlaku.' : '') }),
     el('div', { class: 'baris-chip' }, chipNetral(l.tipe === 'dicari' ? (l.tawar === 'sewa' ? 'Cari sewa' : 'Cari beli') : (l.tawar === 'sewa' ? 'Disewakan' : 'Dijual')))));
+
+  isi.append(judulBagian('Gambar dari agen'), bagianGambarListing(l, wb));
 
   // Agen dan WhatsApp
   const hpAda = !!l.agen_hp;
