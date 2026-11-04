@@ -2640,6 +2640,49 @@ function infoKecepatan() {
     d.klien.length + ' klien, ' + d.properti.length + ' properti' + (S.msServer ? ' · server ' + angka((S.msServer / 1000).toFixed(1)) + ' detik' + (CONFIG.MODE === 'uji' && S.rinci ? ' (' + Object.keys(S.rinci).map(function (k) { return k + ' ' + S.rinci[k]; }).join(', ') + ' ms)' : '') : '') + (S.dariCache && CONFIG.MODE === 'uji' ? ' · dari simpanan' : '') + (d.jumlahArsip ? ' · ' + d.jumlahArsip + ' di arsip' : '') });
 }
 
+/** Kartu ruang Drive (lingkaran persen). Muncul di atas Beranda; kata-katanya dibuat tenang, tidak menakutkan. */
+function kartuDrive(pakai, batas) {
+  const p = Math.min(100, Math.round(pakai / batas * 100));
+  const gb = function (b) { return (b / 1073741824).toFixed(1).replace(/\.0$/, '').replace('.', ','); };
+  const sisa = Math.max(0, batas - pakai);
+  const tingkat = p >= 95 ? 'penuh' : p >= 80 ? 'terisi' : 'lega';
+  const judul = tingkat === 'penuh' ? 'Ruang Drive hampir penuh' : tingkat === 'terisi' ? 'Ruang Drive mulai terisi' : 'Ruang Drive';
+  const isiTeks = tingkat === 'penuh' ? 'Sisa ' + gb(sisa) + ' GB. Mohon dirapikan agar foto baru tetap bisa disimpan.'
+    : tingkat === 'terisi' ? 'Sisa ' + gb(sisa) + ' GB. Boleh dirapikan pelan-pelan.'
+    : gb(pakai) + ' GB dari ' + gb(batas) + ' GB terpakai';
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 72 72');
+  svg.setAttribute('aria-hidden', 'true');
+  const r = 30, keliling = 2 * Math.PI * r;
+  const lat = document.createElementNS(NS, 'circle');
+  lat.setAttribute('cx', '36'); lat.setAttribute('cy', '36'); lat.setAttribute('r', String(r));
+  lat.setAttribute('class', 'drv-lat');
+  const isiR = document.createElementNS(NS, 'circle');
+  isiR.setAttribute('cx', '36'); isiR.setAttribute('cy', '36'); isiR.setAttribute('r', String(r));
+  isiR.setAttribute('class', 'drv-isi');
+  isiR.setAttribute('stroke-dasharray', (keliling * p / 100).toFixed(1) + ' ' + keliling.toFixed(1));
+  svg.append(lat, isiR);
+  return el('div', { class: 'kartu-drive drv-' + tingkat, role: 'status', 'aria-label': judul + '. ' + p + ' persen terpakai. ' + isiTeks },
+    el('div', { class: 'drv-lingkar' }, svg, el('span', { text: p + '%' })),
+    el('div', {}, el('span', { class: 'drv-judul', text: judul }), el('span', { class: 'drv-teks', text: isiTeks })));
+}
+
+/** Memuat ruang Drive di latar (tidak menahan Beranda). Gagal atau tak terbatas: kartu tidak ditampilkan. */
+function muatKartuDrive(wadah, st) {
+  const pasang = function (d) {
+    if (S.layar !== st || !d || !(d.batas > 0)) return;
+    kosongkan(wadah);
+    wadah.append(kartuDrive(d.pakai, d.batas));
+  };
+  if (S.drive && Date.now() - S.drive.waktu < 600000) { pasang(S.drive); return; }
+  panggil('ruangDrive', {}).then(function (j) {
+    if (!j.ok) return;
+    S.drive = { pakai: j.data.pakai, batas: j.data.batas, waktu: Date.now() };
+    pasang(S.drive);
+  }).catch(function () { /* kartu hanya pelengkap */ });
+}
+
 function layarBeranda(isi) {
   kepala({ judul: 'Arsip Properti', tanpaKembali: true, nav: 'beranda' });
   document.body.classList.add('layar-beranda');
@@ -2653,6 +2696,9 @@ function layarBeranda(isi) {
   }
   const cad = peringatanCadangan();
   if (cad) isi.append(buatBanner(cad));
+  const wd = el('div');
+  isi.append(wd);
+  muatKartuDrive(wd, S.layar);
   const nTunda = jumlahFotoTertunda();
   if (nTunda) {
     const kt = cariKlien(S.foto.id_klien);

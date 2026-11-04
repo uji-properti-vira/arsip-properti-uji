@@ -1182,3 +1182,16 @@ body.layar-masuk .isi { max-width: none; padding: 0; }
 .pilihan { border-radius: 9999px; }
 .segmen { border-radius: 9999px; }
 .segmen > * { border-radius: 9999px; }
+
+/* ── v5.3: kartu ruang Drive (lingkaran persen) ── */
+.kartu-drive { display: flex; align-items: center; gap: 16px; background: var(--kartu); border: 1px solid var(--garis); border-radius: 22px; padding: 14px 18px; box-shadow: var(--bayang); margin: 4px 0 14px; }
+.drv-lingkar { position: relative; flex: 0 0 76px; height: 76px; display: grid; place-items: center; font-weight: 800; font-size: 16px; letter-spacing: -0.3px; color: var(--utama); }
+.drv-lingkar svg { position: absolute; inset: 0; width: 76px; height: 76px; transform: rotate(-90deg); }
+.drv-lat { fill: none; stroke: #E9E6DC; stroke-width: 7; }
+.drv-isi { fill: none; stroke: var(--utama); stroke-width: 7; stroke-linecap: round; }
+.drv-judul { display: block; font-size: 18px; font-weight: 800; line-height: 1.25; }
+.drv-teks { display: block; font-size: 16px; color: var(--redup); line-height: 1.35; margin-top: 2px; }
+.drv-terisi { background: var(--waspada-latar); border-color: var(--waspada-garis); }
+.drv-terisi .drv-isi { stroke: #C77A12; } .drv-terisi .drv-lingkar { color: #8A4F00; } .drv-terisi .drv-teks { color: var(--waspada-teks); }
+.drv-penuh { background: #FBE9D9; border-color: #E2A36B; }
+.drv-penuh .drv-isi { stroke: #B4530C; } .drv-penuh .drv-lingkar { color: #8A3A00; } .drv-penuh .drv-teks { color: #5A2A00; }
