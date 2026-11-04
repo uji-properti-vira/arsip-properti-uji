@@ -1173,3 +1173,12 @@ body.layar-masuk .isi { max-width: none; padding: 0; }
   position: absolute; top: 14px; right: 14px; display: grid; place-items: center; width: 48px; height: 48px;
   border: 0; border-radius: 50%; background: rgba(255, 255, 255, .18); color: #fff; cursor: pointer;
 }
+
+/* ── v5.3: tombol bulat (pil), lebih modern ── */
+.tombol { border-radius: 9999px; min-height: 58px; padding: 12px 28px; }
+.tombol-utama, .tombol-wa { min-height: 64px; }
+.tombol-tempel { min-height: 76px; }
+.tombol-kecil { padding: 8px 20px; }
+.pilihan { border-radius: 9999px; }
+.segmen { border-radius: 9999px; }
+.segmen > * { border-radius: 9999px; }

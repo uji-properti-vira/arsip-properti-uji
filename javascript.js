@@ -1278,6 +1278,8 @@ function hapusDokumenDariData(id) {
   S.data.dokumen = S.data.dokumen.filter(function (d) { return d.id_dokumen !== id; });
   const u = S.urlFoto.get(id);
   if (u) { URL.revokeObjectURL(u.url); S.urlFoto.delete(id); }
+  const ua = S.urlFoto.get('asli:' + id);
+  if (ua) { URL.revokeObjectURL(ua.url); S.urlFoto.delete('asli:' + id); }
 }
 
 function catatBaruDibuka(id) {
@@ -1374,6 +1376,35 @@ async function ambilFotoBesar(idDokumen, untuk) {
     buatMini(blob).then(function (m) { if (m) simpanMini(idDokumen, m); }).catch(function () { /* abaikan */ });
   }
   return x;
+}
+
+/**
+ * Bahan foto untuk gambar banner: foto asli tanpa watermark bila ada (banner sudah berlogo dan bernomor sendiri).
+ * Foto lama yang tidak punya versi asli, atau bila gagal dibuka, memakai foto ber-watermark seperti biasa.
+ */
+async function ambilFotoBanner(idDokumen) {
+  const dk = cariDokumen(idDokumen);
+  if (dk && dk.ada_asli && DOK_KLIEN.indexOf(dk.jenis) < 0) {
+    const kunci = 'asli:' + idDokumen;
+    if (S.urlFoto.has(kunci)) return S.urlFoto.get(kunci);
+    try {
+      const j = await panggil('ambilFoto', { id_dokumen: idDokumen, versi: 'asli', untuk: 'banner' });
+      if (j.ok) {
+        const blob = base64KeBlob(j.data.gambar, j.data.mime || 'image/jpeg');
+        const x = { url: URL.createObjectURL(blob), blob: blob };
+        S.urlFoto.set(kunci, x);
+        if (S.urlFoto.size > 20) {
+          const tertua = S.urlFoto.keys().next().value;
+          URL.revokeObjectURL(S.urlFoto.get(tertua).url);
+          S.urlFoto.delete(tertua);
+        }
+        return x;
+      }
+    } catch (e) {
+      if (e instanceof GalatSesi) throw e;
+    }
+  }
+  return ambilFotoBesar(idDokumen, 'bagikan');
 }
 
 async function urlFoto(idDokumen) {
@@ -1711,20 +1742,41 @@ async function buatGambarBanner(pr, idFoto, pilih) {
   const adaPromo = !!(pilih.harga && harga && harga.promo > 0 && harga.promo < harga.normal);
   const barisSpek = pilih.spek ? spekPromo(pr) : [];
   const area = areaPromo(pr);
-  const butuh = 82 + (area ? 50 : 0) + (pilih.harga && harga ? (adaPromo ? 52 : 0) + 98 : 0) + (barisSpek.length ? 22 + 44 * barisSpek.length : 0) + 28;
-  const yFoto = Math.max(440, Math.min(pilih.agen ? 760 : 940, (pilih.agen ? yHub : H - 60) - butuh));
+  const butuh = 62 + (area ? 40 : 0) + (pilih.harga && harga ? (adaPromo ? 44 : 0) + 72 : 0) + (barisSpek.length ? 44 + 38 * (barisSpek.length - 1) + 10 : 0) + 18;
+  const yFoto = Math.max(440, Math.min(pilih.agen ? 800 : 960, (pilih.agen ? yHub : H - 60) - butuh));
 
-  const x = await ambilFotoBesar(idFoto, 'bagikan');
+  const x = await ambilFotoBanner(idFoto);
   const img = new Image();
   img.src = x.url;
   await img.decode();
-  const s = Math.max(W / img.naturalWidth, yFoto / img.naturalHeight);
-  const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const rasio = iw / ih, rasioArea = W / yFoto;
+  const hilang = rasio >= rasioArea ? 1 - rasioArea / rasio : 1 - rasio / rasioArea;   // bagian foto yang terpotong bila dipenuhkan
   c.save();
   c.beginPath();
   c.rect(0, 0, W, yFoto);
   c.clip();
-  c.drawImage(img, (W - dw) / 2, (yFoto - dh) / 2, dw, dh);
+  if (hilang > 0.25) {
+    // Foto tegak: tampil utuh di tengah, sisi kiri-kanan diisi bayangan buram dari foto yang sama.
+    let k = img, kw = iw, kh = ih;
+    [48, 160].forEach(function (lebar) {
+      const k2 = document.createElement('canvas');
+      k2.width = lebar;
+      k2.height = Math.max(1, Math.round(lebar * yFoto / W));
+      const sk = Math.max(k2.width / kw, k2.height / kh);
+      k2.getContext('2d').drawImage(k, (k2.width - kw * sk) / 2, (k2.height - kh * sk) / 2, kw * sk, kh * sk);
+      k = k2; kw = k2.width; kh = k2.height;
+    });
+    c.imageSmoothingQuality = 'high';
+    c.drawImage(k, 0, 0, W, yFoto);
+    c.fillStyle = 'rgba(0,0,0,0.18)';
+    c.fillRect(0, 0, W, yFoto);
+    const sc = Math.min(W / iw, yFoto / ih);
+    c.drawImage(img, (W - iw * sc) / 2, (yFoto - ih * sc) / 2, iw * sc, ih * sc);
+  } else {
+    const s = Math.max(W / iw, yFoto / ih);
+    c.drawImage(img, (W - iw * s) / 2, (yFoto - ih * s) / 2, iw * s, ih * s);
+  }
   c.restore();
 
   try { const lg = await muatAset('logo-banner.png'); c.drawImage(lg, 0, 0, 300, 150); } catch (e) { /* logo tidak termuat: gambar tetap dibuat */ }
@@ -1751,37 +1803,37 @@ async function buatGambarBanner(pr, idFoto, pilih) {
   // Nama, area, harga, spesifikasi
   c.textAlign = 'left';
   c.textBaseline = 'alphabetic';
-  let y = yFoto + 82;
+  let y = yFoto + 62;
   c.fillStyle = NAVY;
   const nama = pr.nama_properti || 'Properti';
-  tulisanMuat(c, nama, 64, '800', W - 96);
+  tulisanMuat(c, nama, 52, '800', W - 96);
   c.fillText(nama, 48, y);
   if (area) {
     c.fillStyle = '#3A3A3A';
-    tulisanMuat(c, area, 34, '600', W - 96);
-    c.fillText(area, 48, y + 50);
-    y += 50;
+    tulisanMuat(c, area, 28, '600', W - 96);
+    c.fillText(area, 48, y + 40);
+    y += 40;
   }
   if (pilih.harga && harga) {
     if (adaPromo) {
       const tn = hargaPromo(harga.normal) + harga.akhiran;
-      c.font = '600 36px' + F;
+      c.font = '600 28px' + F;
       c.fillStyle = '#6B6B6B';
-      c.fillText(tn, 48, y + 52);
-      c.fillRect(44, y + 40, c.measureText(tn).width + 8, 4);
-      y += 52;
+      c.fillText(tn, 48, y + 44);
+      c.fillRect(44, y + 34, c.measureText(tn).width + 8, 3);
+      y += 44;
     }
     const tp = hargaPromo(adaPromo ? harga.promo : harga.normal) + harga.akhiran;
     c.fillStyle = NAVY;
-    tulisanMuat(c, tp, 92, '800', W - 96);
-    c.fillText(tp, 48, y + 98);
-    y += 98;
+    tulisanMuat(c, tp, 68, '800', W - 96);
+    c.fillText(tp, 48, y + 72);
+    y += 72;
   }
   if (barisSpek.length) {
     c.fillStyle = '#3A3A3A';
     barisSpek.forEach(function (baris, i) {
-      tulisanMuat(c, baris, 32, '600', W - 96);
-      c.fillText(baris, 48, y + 52 + i * 44);
+      tulisanMuat(c, baris, 25, '600', W - 96);
+      c.fillText(baris, 48, y + 44 + i * 38);
     });
   }
 
