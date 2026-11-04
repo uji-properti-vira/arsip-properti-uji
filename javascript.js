@@ -1382,8 +1382,10 @@ async function ambilFotoBesar(idDokumen, untuk) {
  * Bahan foto untuk gambar banner: foto asli tanpa watermark bila ada (banner sudah berlogo dan bernomor sendiri).
  * Foto lama yang tidak punya versi asli, atau bila gagal dibuka, memakai foto ber-watermark seperti biasa.
  */
+const BANNER_INFO = { lama: 0, gagal: 0, pesan: '' };   // dicatat tiap pembuatan banner, untuk penjelasan di layar
 async function ambilFotoBanner(idDokumen) {
   const dk = cariDokumen(idDokumen);
+  if (!(dk && dk.ada_asli)) BANNER_INFO.lama++;
   if (dk && dk.ada_asli && DOK_KLIEN.indexOf(dk.jenis) < 0) {
     const kunci = 'asli:' + idDokumen;
     if (S.urlFoto.has(kunci)) return S.urlFoto.get(kunci);
@@ -1400,8 +1402,11 @@ async function ambilFotoBanner(idDokumen) {
         }
         return x;
       }
+      BANNER_INFO.gagal++;
+      BANNER_INFO.pesan = j.pesan || '';
     } catch (e) {
       if (e instanceof GalatSesi) throw e;
+      BANNER_INFO.gagal++;
     }
   }
   return ambilFotoBesar(idDokumen, 'bagikan');
@@ -1759,7 +1764,7 @@ async function buatGambarBanner(pr, idFoto, pilih) {
   if (hilang > 0.25) {
     // Foto tegak: tampil utuh di tengah, sisi kiri-kanan diisi bayangan buram dari foto yang sama.
     let k = img, kw = iw, kh = ih;
-    [48, 160].forEach(function (lebar) {
+    [24, 48, 96, 192, 384].forEach(function (lebar) {
       const k2 = document.createElement('canvas');
       k2.width = lebar;
       k2.height = Math.max(1, Math.round(lebar * yFoto / W));
@@ -1962,6 +1967,7 @@ function layarPromo(isi, p) {
     }
     catatan.textContent = 'Menyiapkan ' + terpilih.length + ' gambar...';
     const baru = [];
+    BANNER_INFO.lama = 0; BANNER_INFO.gagal = 0; BANNER_INFO.pesan = '';
     try {
       for (let i = 0; i < terpilih.length; i++) {
         const b = await buatGambarPromo(pr, terpilih[i].id_dokumen, pilih);
@@ -1973,6 +1979,10 @@ function layarPromo(isi, p) {
       kosongkan(wadahHasil);
       hasil.forEach(function (h) { wadahHasil.append(el('img', { class: 'pratinjau-promo', alt: 'Pratinjau gambar promo', src: h.url })); });
       catatan.textContent = hasil.length + ' gambar, ukuran 4:5 (1080 × 1350).';
+      if (pilih.gaya === 'banner') {
+        if (BANNER_INFO.gagal) catatan.textContent += ' Foto asli belum bisa dibuka' + (BANNER_INFO.pesan ? ' (' + BANNER_INFO.pesan + ')' : '') + ', jadi memakai foto ber-watermark. Pastikan server sudah versi terbaru.';
+        else if (BANNER_INFO.lama) catatan.textContent += ' ' + BANNER_INFO.lama + ' foto belum punya versi asli (diunggah sebelum fitur ini), jadi masih ber-watermark. Unggah ulang fotonya agar bersih.';
+      }
       tombolBagi.disabled = false;
       tombolUnduh.disabled = false;
     } catch (e) {
