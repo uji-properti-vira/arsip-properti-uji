@@ -2976,8 +2976,20 @@ function tampilHasilCari(wadah, q, mode, tampil, hapusKata, F, ubahF) {
     }
 
     // Daftar klien: tab Penjual dan Pembeli
+    // Angka merah di tab = jumlah yang tampil di tab itu dengan filter yang sedang dipakai (selalu sama dengan judul daftar).
+    const sesuaiPenjual = function (k) {
+      return !(F.areaJ || F.progresJ) || propertiKlien(k.id_klien).some(function (pr) { return (!F.areaJ || pr.area === F.areaJ) && sesuaiProgres(pr, F.progresJ); });
+    };
+    const sesuaiPembeli = function (k) {
+      return (!F.statusB || (k.status_beli || 'Mencari') === F.statusB) &&
+        (!F.bangunanB || jenisDasar(k.kebutuhan_jenis) === F.bangunanB) && (!F.areaB || k.kebutuhan_area === F.areaB);
+    };
     const jumlah = { Penjual: 0, Pembeli: 0 };
-    S.data.klien.forEach(function (k) { if (!k.arsip && jumlah[k.peran] !== undefined) jumlah[k.peran]++; });
+    S.data.klien.forEach(function (k) {
+      if (k.arsip) return;
+      if (k.peran === 'Penjual' && sesuaiPenjual(k)) jumlah.Penjual++;
+      else if (k.peran === 'Pembeli' && sesuaiPembeli(k)) jumlah.Pembeli++;
+    });
     wadah.append(segmen(
       [{ kode: 'Penjual', label: 'Penjual', lencana: jumlah.Penjual }, { kode: 'Pembeli', label: 'Pembeli', lencana: jumlah.Pembeli }],
       F.peran, function (v) { ubahF({ peran: v }); }, 'segmen-2'));
