@@ -103,7 +103,8 @@ const DOK_KLIEN = ['KTP', 'NPWP'];
 const DOK_PROPERTI = ['PBB', 'Sertifikat', 'Foto properti'];
 const DOK_BOLEH_DIBAGIKAN = ['PBB', 'Sertifikat'];   // hanya dengan persetujuan penjual; KTP dan NPWP tidak pernah
 // Disimpan dua versi: ber-watermark (untuk dilihat, dibagikan, PDF) dan asli tanpa watermark (arsip, unduh terbatas).
-const DOK_DUA_VERSI = ['KTP', 'NPWP', 'Sertifikat'];
+const DOK_DUA_VERSI = ['KTP', 'NPWP', 'Sertifikat', 'Foto properti'];   // 5.3: foto properti ikut, supaya banner bisa memakai foto asli
+const DOK_SUDAH_MARKA = ['KTP', 'NPWP', 'Sertifikat', 'Foto properti'];   // foto jenis ini yang sudah ada sudah ber-watermark
 const JENIS_PROP = ['Rumah', 'Tanah', 'Ruko', 'Lainnya'];
 const ARAH_HADAP = ['Utara', 'Timur Laut', 'Timur', 'Tenggara', 'Selatan', 'Barat Daya', 'Barat', 'Barat Laut'];
 const LISTRIK_VA = ['900', '1300', '2200', '3500', '4400', '5500'];
@@ -4158,9 +4159,10 @@ function layarUbahDokumen(isi, p) {
       selTempat.focus();
       return;
     }
-    // Foto lama yang belum punya versi asli dan diubah jadi KTP/NPWP/Sertifikat: kirim versi ber-watermark-nya.
+    // Foto yang belum punya versi asli dan belum ber-watermark (PBB, Lainnya) lalu diubah jadi jenis dua-versi: kirim versi ber-watermark-nya.
+    // Foto yang sudah ber-watermark (jenis lama KTP/NPWP/Sertifikat/Foto properti) tidak diberi watermark kedua kali.
     let gambarBaru = '';
-    if (DOK_DUA_VERSI.indexOf(jenis) >= 0 && !d.ada_asli) {
+    if (DOK_DUA_VERSI.indexOf(jenis) >= 0 && !d.ada_asli && DOK_SUDAH_MARKA.indexOf(d.jenis) < 0) {
       try {
         const foto = await ambilFotoBesar(d.id_dokumen);
         gambarBaru = await beriMarka(await blobKeBase64(foto.blob));
