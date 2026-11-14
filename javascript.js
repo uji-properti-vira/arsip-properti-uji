@@ -1,7 +1,7 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
-   Versi 5.3 — 4 November 2026. Butuh Code.gs 2.9. Baru: gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
+   Versi 5.4 — 5 November 2026. Butuh Code.gs 3.0. Baru: komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
    daftar panjang tampil bertahap saat digulir; Listing punya panjang x lebar, keterangan tambahan masuk ke catatan,
    umur listing; baris kecil di Beranda yang menunjukkan ukuran dan lama muat data.
    Versi 5.0 — 2 November 2026. Butuh Code.gs 2.5. Baru: menu Listing untuk info properti dari grup WhatsApp agen lain
@@ -90,11 +90,11 @@ const CONFIG = {
   PDF_MAKS_FOTO: 30,          // harus sama dengan PDF_MAKS_FOTO di Code.gs
   BATAS_BUDGET_HAMPIR: 0.30,  // harga sampai 30% di atas budget = "hampir cocok"
   BATAS_BUDGET_ALT: 0.60,     // 30% sampai 60% di atas budget = "alternatif"
-  MARKA_TEKS: 'Pudji',        // tulisan di bawah logo watermark foto properti
+  MARKA_TEKS: 'GADING PRO',   // tulisan watermark di tengah KTP, NPWP, dan Sertifikat (foto properti tanpa watermark)
   NO_HP_PEMILIK: '0813 8279 9845',   // kaki gambar promo dan isian Nama dan HP agen
-  NAMA_BANNER: 'PUJI TAN',           // nama di strip Gaya Banner Gading Pro (QR qr-wa.png dibuat dari nomor ini)
+  NAMA_BANNER: 'Puji Tan',           // nama di gambar promo, kedua gaya (QR qr-wa.png dibuat dari nomor ini)
   FOTO_PER_HALAMAN: 6,        // foto per halaman di layar Bagikan (2 kolom x 3 baris)
-  VERSI_SERVER_MIN: '2.9'     // versi Code.gs yang dibutuhkan tampilan ini
+  VERSI_SERVER_MIN: '3.0'     // versi Code.gs yang dibutuhkan tampilan ini
 };
 
 /* ── Daftar tetap ─────────────────────────────────────────── */
@@ -103,8 +103,10 @@ const DOK_KLIEN = ['KTP', 'NPWP'];
 const DOK_PROPERTI = ['PBB', 'Sertifikat', 'Foto properti'];
 const DOK_BOLEH_DIBAGIKAN = ['PBB', 'Sertifikat'];   // hanya dengan persetujuan penjual; KTP dan NPWP tidak pernah
 // Disimpan dua versi: ber-watermark (untuk dilihat, dibagikan, PDF) dan asli tanpa watermark (arsip, unduh terbatas).
-const DOK_DUA_VERSI = ['KTP', 'NPWP', 'Sertifikat', 'Foto properti'];   // 5.3: foto properti ikut, supaya banner bisa memakai foto asli
-const DOK_SUDAH_MARKA = ['KTP', 'NPWP', 'Sertifikat', 'Foto properti'];   // foto jenis ini yang sudah ada sudah ber-watermark
+// 5.4: foto properti tidak lagi diberi watermark (logo cukup di pojok gambar promo), jadi cukup satu file.
+// KTP, NPWP, dan Sertifikat tetap ber-watermark, sebagai pengaman kalau fotonya tersebar.
+const DOK_DUA_VERSI = ['KTP', 'NPWP', 'Sertifikat'];
+const DOK_SUDAH_MARKA = ['KTP', 'NPWP', 'Sertifikat'];   // foto jenis ini yang sudah ada sudah ber-watermark
 const JENIS_PROP = ['Rumah', 'Tanah', 'Ruko', 'Lainnya'];
 const ARAH_HADAP = ['Utara', 'Timur Laut', 'Timur', 'Tenggara', 'Selatan', 'Barat Daya', 'Barat', 'Barat Laut'];
 const LISTRIK_VA = ['900', '1300', '2200', '3500', '4400', '5500'];
@@ -1038,14 +1040,24 @@ function ukuranTeks(pr, tanpaSertifikat) {
   ].filter(Boolean).join(' · ');
 }
 
-function komisiTeks(pr) {
-  if (!pr.komisi_jenis || !pr.komisi_nilai) return '';
-  if (pr.komisi_jenis === 'persen') {
-    const h = hargaBerlaku(pr.harga_jual, pr.harga_jual_promo) * Number(pr.komisi_nilai) / 100;
-    return angkaTampil(pr.komisi_nilai) + '%' + (h > 0 ? ' (sekitar ' + rupiahPendek(h) + ')' : '');
+function komisiSatu(jenis, nilai, harga) {
+  if (!jenis || !nilai) return '';
+  if (jenis === 'persen') {
+    const h = harga * Number(nilai) / 100;
+    return angkaTampil(nilai) + '%' + (h > 0 ? ' (sekitar ' + rupiahPendek(h) + ')' : '');
   }
-  return rupiahBaca(pr.komisi_nilai);
+  return rupiahBaca(nilai);
 }
+
+/** 5.4: komisi jual dan komisi sewa dihitung sendiri-sendiri, dari harga masing-masing. */
+function komisiJualTeks(pr) { return komisiSatu(pr.komisi_jenis, pr.komisi_nilai, hargaBerlaku(pr.harga_jual, pr.harga_jual_promo)); }
+function komisiSewaTeks(pr) { return komisiSatu(pr.komisi_jenis_sewa, pr.komisi_nilai_sewa, hargaBerlaku(pr.harga_sewa, pr.harga_sewa_promo)); }
+function komisiTeks(pr) {
+  const j = komisiJualTeks(pr), w = komisiSewaTeks(pr);
+  return [j ? 'Jual ' + j : '', w ? 'Sewa ' + w + satuanSingkat(pr) : ''].filter(Boolean).join(' · ');
+}
+/** "/thn" atau "/bln" di belakang komisi sewa, mengikuti satuan sewa propertinya. */
+function satuanSingkat(pr) { return pr.disewakan && pr.satuan_sewa === 'bulan' ? '/bln' : pr.disewakan ? '/thn' : ''; }
 
 /** Semua area yang pernah diisi (properti dan kebutuhan pembeli), urut abjad. */
 function daftarArea(dariProperti) {
@@ -1333,7 +1345,8 @@ function terimaData(d) {
     const lama = !('dijual' in p);
     const t = lama ? tawaranDariLama(p.penawaran) : {};
     return Object.assign({ kondisi: '', dijual: false, disewakan: false, harga_jual: '', harga_sewa: '', satuan_sewa: '', luas_tanah: '', luas_bangunan: '',
-      kamar_tidur: '', kamar_mandi: '', sertifikat: '', komisi_jenis: '', komisi_nilai: '', tanggal_sold: '' }, p, t);
+      kamar_tidur: '', kamar_mandi: '', sertifikat: '', komisi_jenis: '', komisi_nilai: '',
+      komisi_jenis_sewa: '', komisi_nilai_sewa: '', tanggal_sold: '' }, p, t);
   });
   d.dokumen = isiSkema(d.dokumen, sk.dokumen);
   d.listing = isiSkema(d.listing, sk.listing);
@@ -1351,7 +1364,14 @@ function tawaranDariLama(v) {
 
 function serverLama() {
   const v = S.data && S.data.versiPustaka;
-  return !v || String(v) < CONFIG.VERSI_SERVER_MIN;
+  if (!v) return true;
+  // Dibandingkan sebagai angka per bagian, supaya 2.10 terbaca lebih baru dari 2.9 (perbandingan teks keliru).
+  const a = String(v).split('.').map(Number), b = CONFIG.VERSI_SERVER_MIN.split('.').map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0, y = b[i] || 0;
+    if (x !== y) return x < y;
+  }
+  return false;
 }
 
 /** Foto besar di memori (alamat + isi), diambil dari server setelah login. */
@@ -1703,8 +1723,9 @@ async function buatGambarPromo(pr, idFoto, pilih) {
     });
   }
   if (pilih.agen) {
-    tulisanMuat(c, 'Hubungi ' + CONFIG.NAMA_PEMILIK + ' · ' + CONFIG.NO_HP_PEMILIK, 42, '700', W - 120);
-    c.fillText('Hubungi ' + CONFIG.NAMA_PEMILIK + ' · ' + CONFIG.NO_HP_PEMILIK, W / 2, H - 70);
+    const kaki = 'Hubungi ' + CONFIG.NAMA_BANNER + ' · ' + CONFIG.NO_HP_PEMILIK;
+    tulisanMuat(c, kaki, 46, '800', W - 120);
+    c.fillText(kaki, W / 2, H - 70);
   }
   c.restore();
 
@@ -1926,7 +1947,7 @@ function layarPromo(isi, p) {
   const tombolUnduh = tombol('tombol-kedua', 'unduh', 'Unduh gambar', unduh);
   const tandaHarga = kotakCentang('Tulisan harga', 'Harga normal dan harga promo', true, function (b) { pilih.harga = b; segarkan(); });
   const tandaSpek = kotakCentang('Tulisan spesifikasi', 'Luas, kamar, carport, listrik, menghadap', true, function (b) { pilih.spek = b; segarkan(); });
-  const tandaAgen = kotakCentang('Nama dan HP agen', 'Hubungi ' + CONFIG.NAMA_PEMILIK + ' · ' + CONFIG.NO_HP_PEMILIK, true, function (b) { pilih.agen = b; segarkan(); });
+  const tandaAgen = kotakCentang('Nama dan HP agen', 'Hubungi ' + CONFIG.NAMA_BANNER + ' · ' + CONFIG.NO_HP_PEMILIK, true, function (b) { pilih.agen = b; segarkan(); });
 
   fotos.forEach(function (f) {
     const img = el('img', { alt: '' });
@@ -2635,7 +2656,7 @@ function peringatanCadangan() {
 
 /** Baris kecil di bawah Beranda: seberapa besar dan seberapa lama data dimuat (untuk memantau kecepatan). */
 function infoKecepatan() {
-  if (!S.ukuranData) return null;
+  if (CONFIG.MODE !== 'uji' || !S.ukuranData) return null;   // 5.3: hanya di versi uji; klien tidak perlu melihat angka teknis
   const d = S.data;
   const angka = function (n) { return String(n).replace('.', ','); };
   return el('p', { class: 'kecil redup info-kecepatan', text: 'Data ' + angka((S.ukuranData / 1048576).toFixed(1)) + ' MB · dimuat ' + angka((S.waktuMuat / 1000).toFixed(1)) + ' detik · ' +
@@ -3335,6 +3356,7 @@ function dataProperti(pr, ubahan) {
     harga_jual: pr.harga_jual || '', harga_sewa: pr.harga_sewa || '', satuan_sewa: pr.satuan_sewa || '',
     luas_tanah: pr.luas_tanah || '', luas_bangunan: pr.luas_bangunan || '', kamar_tidur: pr.kamar_tidur || '', kamar_mandi: pr.kamar_mandi || '',
     sertifikat: pr.sertifikat || '', komisi_jenis: pr.komisi_jenis || '', komisi_nilai: pr.komisi_nilai || '',
+    komisi_jenis_sewa: pr.komisi_jenis_sewa || '', komisi_nilai_sewa: pr.komisi_nilai_sewa || '',
     panjang_tanah: pr.panjang_tanah || '', lebar_tanah: pr.lebar_tanah || '', carport: pr.carport ?? '',
     listrik_va: pr.listrik_va || '', sumber_air: pr.sumber_air || '', menghadap: pr.menghadap || '', bu: adaBU(pr) ? 'ya' : '',
     harga_jual_promo: pr.harga_jual_promo || '', harga_sewa_promo: pr.harga_sewa_promo || '',
@@ -3604,35 +3626,30 @@ function layarFoto(isi, p) {
 
 /* ── Watermark foto properti: logo Gading Pro + nama agen, di tengah, samar tapi terbaca ── */
 /** Logo Gading Pro + nama agen di tengah gambar (W x H). Dipakai foto properti dan gambar promo. */
-function tempelMarka(c, W, H, logo) {
-    const rasio = logo.height / logo.width;
-    const lw = Math.min(W * 0.3, H * 0.4 / rasio);
-    const lh = lw * rasio;
-    const fs = Math.round(lw * 0.18);
-    const gap = fs * 0.18;
-    const total = lh + gap + fs;
-    const x = (W - lw) / 2;
-    const y = (H - total) / 2;
-    // Logo: lingkar putih tipis di sekelilingnya supaya huruf hitamnya tetap terbaca di foto gelap.
-    c.save();
-    c.globalAlpha = 0.42;
-    c.shadowColor = 'rgba(255,255,255,1)';
-    c.shadowBlur = lw * 0.05;
-    c.drawImage(logo, x, y, lw, lh);
-    c.restore();
-    // Nama agen
-    c.save();
-    c.globalAlpha = 0.55;
-    c.font = '700 ' + fs + 'px "Segoe UI", Roboto, Arial, sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'top';
-    c.lineJoin = 'round';
-    c.lineWidth = fs * 0.08;
-    c.strokeStyle = 'rgba(0,0,0,0.4)';
-    c.fillStyle = '#ffffff';
-    c.strokeText(CONFIG.MARKA_TEKS, W / 2, y + lh + gap);
-    c.fillText(CONFIG.MARKA_TEKS, W / 2, y + lh + gap);
-    c.restore();
+function tempelMarka(c, W, H) {
+  // 5.4: satu baris tulisan besar saja (tanpa logo, tanpa nama), supaya tidak bertabrakan
+  // dengan tulisan properti di gambar promo. Logo cukup di pojok kiri atas gambar promo.
+  const teks = CONFIG.MARKA_TEKS;
+  // Lebar dibatasi sisi pendek juga: foto lebar dipotong jadi 4:5 di gambar promo,
+  // jadi tulisan yang terlalu melebar akan terpotong kiri-kanan.
+  const lebar = Math.min(W * 0.74, H * 0.62);
+  let fs = Math.round(Math.min(W, H) * 0.13);
+  const pasangFont = function () { c.font = '800 ' + fs + 'px "Segoe UI", Roboto, Arial, sans-serif'; };
+  pasangFont();
+  while (c.measureText(teks).width > lebar && fs > 12) { fs -= 2; pasangFont(); }
+  c.save();
+  c.globalAlpha = 0.34;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.lineJoin = 'round';
+  c.lineWidth = Math.max(2, fs * 0.07);
+  c.strokeStyle = 'rgba(0,0,0,0.45)';
+  c.fillStyle = '#ffffff';
+  // Agak di atas tengah: bagian bawah foto dipakai tulisan nama, harga, dan spesifikasi.
+  const y = H * 0.44;
+  c.strokeText(teks, W / 2, y);
+  c.fillText(teks, W / 2, y);
+  c.restore();
 }
 
 const MARKA = { janji: null };
@@ -3650,7 +3667,6 @@ function muatMarka() {
 
 /** Hanya untuk Foto properti, dipasang tepat sebelum dikirim. Hasil: base64 JPEG baru. */
 async function beriMarka(base64) {
-  const logo = await muatMarka();
   const blob = base64KeBlob(base64, 'image/jpeg');
   const gbr = new Image();
   const url = URL.createObjectURL(blob);
@@ -3664,7 +3680,7 @@ async function beriMarka(base64) {
     kanvas.height = H;
     const c = kanvas.getContext('2d');
     c.drawImage(gbr, 0, 0, W, H);
-    tempelMarka(c, W, H, logo);
+    tempelMarka(c, W, H);
     const hasil = await new Promise(function (ok, gagal) {
       kanvas.toBlob(function (b) { if (b) ok(b); else gagal(new Error('toBlob')); }, 'image/jpeg', CONFIG.FOTO_KUALITAS);
     });
@@ -3926,9 +3942,9 @@ function layarSimpanFoto(isi, p) {
       tandai(it);
       let gambarKirim = it.base64;
       const duaVersi = DOK_DUA_VERSI.indexOf(it.jenis) >= 0;
-      if (it.jenis === 'Foto properti' || duaVersi) {
+      if (duaVersi) {
         try { gambarKirim = await beriMarka(it.base64); } catch (e0) {
-          // Lebih baik berhenti daripada mengirim foto properti tanpa watermark.
+          // Lebih baik berhenti daripada menyimpan KTP, NPWP, atau Sertifikat tanpa watermark.
           it.terkunci = false;
           it.galat = 'Watermark belum terpasang. Tekan Simpan lagi.';
           tandai(it);
@@ -4428,15 +4444,35 @@ function bidangArea(id, label, keterangan, nilai, kotaSaja) {
   const awalKota = kotaSaja ? kotaDariArea(nilai) : (nilai && nilai.indexOf(',') >= 0 ? kotaDariArea(nilai) : '');
   const sendiri = (!kotaSaja && nilai && nilai.indexOf(',') < 0) ? nilai : '';   // data lama tanpa koma
   let detail = null;
+  // Kota dulu. Bila yang diketik ternyata nama kecamatan atau kelurahan (misalnya Cikupa atau Klojen),
+  // namanya tetap muncul lengkap dengan kotanya, lalu memilihnya mengisi kolom Kota dengan kota itu.
   const sarankanKota = function (q) {
     const pakai = daftarArea(false).map(function (a) { return kotaDariArea(a); }).filter(Boolean)
       .filter(function (v, i, d) { return d.indexOf(v) === i; }).map(function (k) { return { n: k, nn: norm(k) }; });
     const dasar = WILAYAH.data ? WILAYAH.data.kota : [];
     const sudah = {};
-    return cariSaran(pakai.concat(dasar), q).filter(function (x) { if (sudah[x.nn]) return false; sudah[x.nn] = true; return true; });
+    const hasil = cariSaran(pakai.concat(dasar), q).filter(function (x) { if (sudah[x.nn]) return false; sudah[x.nn] = true; return true; });
+    if (hasil.length >= 10 || !WILAYAH.data) return hasil;
+    const sudahArea = {};
+    const tambahan = cariSaran(WILAYAH.data.area, q).filter(function (x) {
+      const k = x.nn + '|' + norm(x.k || '');
+      if (sudah[x.nn] || sudahArea[k]) return false;
+      sudahArea[k] = true;
+      return true;
+    });
+    return hasil.concat(tambahan).slice(0, 10);
   };
-  const kota = isianSaran(id + 'Kota', kotaSaja ? label : 'Kota', kotaSaja ? keterangan : 'Pilih dari saran', awalKota,
-    'Contoh: Jakarta Selatan, Depok, Bogor', sarankanKota, function (x) { kota.isian.value = x.n; peringatan(); });
+  const kota = isianSaran(id + 'Kota', kotaSaja ? label : 'Kota', kotaSaja ? keterangan : 'Boleh ketik kecamatan, kotanya terisi sendiri', awalKota,
+    'Contoh: Tangerang Selatan, Cikupa, Depok', sarankanKota, function (x) {
+      // Saran kecamatan membawa nama kotanya: kolom Kota diisi kota itu, kecamatannya pindah ke kolom Area.
+      if (x.k) {
+        kota.isian.value = x.k;
+        if (detail && !detail.isian.value.trim()) detail.isian.value = x.n;
+      } else {
+        kota.isian.value = x.n;
+      }
+      peringatan();
+    });
   if (!kotaSaja) {
     detail = isianSaran(id, label, keterangan, awalDetail || sendiri, 'Contoh: Bintaro, Bojongsari, Daan Mogot',
       function (q) {
@@ -5464,7 +5500,7 @@ function dialogTempel(awal) {
 
 const ISIAN_LISTING_KOSONG = {
   tipe: 'stok', nama: '', jenis: '', tawar: '', lokasi: '', luas_tanah: '', luas_bangunan: '', panjang_tanah: '', lebar_tanah: '', lantai: '', kamar_tidur: '', kamar_mandi: '',
-  sertifikat: '', menghadap: '', harga: '', nego: '', agen_nama: '', agen_kantor: '', agen_hp: '', komisi_kesepakatan: '', catatan: ''
+  sertifikat: '', menghadap: '', harga: '', nego: '', agen_nama: '', agen_kantor: '', agen_hp: '', komisi_kesepakatan: '', komisi_sewa: '', catatan: ''
 };
 
 function layarFormListing(isi, p) {
@@ -5556,7 +5592,8 @@ function layarFormListing(isi, p) {
   const agenHp = kuning(bidangTeks('fLHp', 'Nomor HP agen', 'Untuk menghubungi lewat WhatsApp', v.agen_hp ? formatHp(v.agen_hp) : '', { type: 'tel', inputmode: 'tel', autocomplete: 'off', maxlength: '20', placeholder: 'Contoh: 0812 3456 7890' }), 'agen_hp');
   pasangRapi(agenHp.isian, function (x) { const n = normalHp(x); return hpValid(n) ? formatHp(n) : x; });
 
-  const komisi = bidangTeks('fLKomisi', 'Bagi komisi untuk saya', 'Boleh kosong · isi sesuai kesepakatan dengan agen', v.komisi_kesepakatan, { autocomplete: 'off', maxlength: '80', placeholder: 'Contoh: 50:50' });
+  const komisi = bidangTeks('fLKomisi', 'Kalau terjual', 'Boleh kosong', v.komisi_kesepakatan, { autocomplete: 'off', maxlength: '80', placeholder: 'Contoh: 50:50' });
+  const komisiSewa = bidangTeks('fLKomisiSewa', 'Kalau tersewa', 'Boleh kosong', v.komisi_sewa, { autocomplete: 'off', maxlength: '80', placeholder: 'Contoh: 1 bulan sewa' });
   const catatan = bidangTeks('fLCatatan', 'Catatan', 'Boleh kosong', v.catatan, { maxlength: '1000' }, true);
   pasangRapi(catatan.isian, rapiKalimat_);
 
@@ -5604,7 +5641,9 @@ function layarFormListing(isi, p) {
     el('div', { class: 'baris-3' }, lantai.wadah, kt.wadah, km.wadah),
     sert.wadah, sertTeks.wadah, hadap.wadah,
     judulBagian('Agen yang memposting'), agenNama.wadah, agenKantor.wadah, agenHp.wadah,
-    judulBagian('Komisi'), komisi.wadah, catatan.wadah);
+    judulBagian('Bagi komisi untuk saya'),
+    el('p', { class: 'kecil redup', text: 'Isi sesuai kesepakatan dengan agen. Jual dan sewa boleh beda.' }),
+    komisi.wadah, komisiSewa.wadah, catatan.wadah);
   if (blokGambar) isi.append(blokGambar);
   if (teksAsli) {
     isi.append(el('details', { class: 'lipat' },
@@ -5666,7 +5705,7 @@ function layarFormListing(isi, p) {
       sertifikat: !sert.nilai() ? '' : sert.nilai() === 'Lainnya' ? 'Lainnya: ' + teksSert : sert.nilai(),
       menghadap: hadap.nilai() || '', harga: harga.nilai(), nego: nego.nilai() || '',
       agen_nama: rapiNama_(agenNama.isian.value), agen_kantor: agenKantor.isian.value.trim(), agen_hp: hp,
-      komisi_kesepakatan: komisi.isian.value.trim(), status: ubah ? (lama.status || 'Baru') : 'Baru',
+      komisi_kesepakatan: komisi.isian.value.trim(), komisi_sewa: komisiSewa.isian.value.trim(), status: ubah ? (lama.status || 'Baru') : 'Baru',
       catatan: rapiKalimat_(catatan.isian.value)
     };
     if (!ubah) kirim.teks_asli = teksAsli;
@@ -5757,18 +5796,21 @@ function layarDetailListing(isi, p) {
     }
   }
 
-  // Komisi kesepakatan
-  const komisi = bidangTeks('dLKomisi', 'Bagi komisi untuk saya', 'Boleh kosong · isi sesuai kesepakatan dengan agen', l.komisi_kesepakatan, { autocomplete: 'off', maxlength: '80', placeholder: 'Contoh: 50:50' });
+  // Komisi kesepakatan: jual dan sewa dipisah, karena bagiannya sering berbeda.
+  const komisi = bidangTeks('dLKomisi', 'Kalau terjual', 'Boleh kosong', l.komisi_kesepakatan, { autocomplete: 'off', maxlength: '80', placeholder: 'Contoh: 50:50' });
+  const komisiSewa = bidangTeks('dLKomisiSewa', 'Kalau tersewa', 'Boleh kosong', l.komisi_sewa, { autocomplete: 'off', maxlength: '80', placeholder: 'Contoh: 1 bulan sewa' });
   const tombolKomisi = tombol('tombol-kedua', 'centang', 'Simpan komisi', async function () {
     tombolKomisi.disabled = true;
     S.sibuk = true;
     try {
-      const j = await panggil('aturListing', { id_listing: l.id_listing, komisi_kesepakatan: komisi.isian.value.trim() });
+      const j = await panggil('aturListing', { id_listing: l.id_listing, komisi_kesepakatan: komisi.isian.value.trim(), komisi_sewa: komisiSewa.isian.value.trim() });
       S.sibuk = false;
       if (j.ok) {
         simpanKeDaftar(S.data.listing, 'id_listing', j.data.listing);
         l.komisi_kesepakatan = j.data.listing.komisi_kesepakatan;
-        tampilBanner(wb, { jenis: 'sukses', judul: 'Komisi tersimpan', pesan: l.komisi_kesepakatan || 'Dikosongkan.' });
+        l.komisi_sewa = j.data.listing.komisi_sewa || '';
+        const isiKomisi = [l.komisi_kesepakatan ? 'Jual ' + l.komisi_kesepakatan : '', l.komisi_sewa ? 'Sewa ' + l.komisi_sewa : ''].filter(Boolean).join(' · ');
+        tampilBanner(wb, { jenis: 'sukses', judul: 'Komisi tersimpan', pesan: isiKomisi || 'Dikosongkan.' });
       } else tampilBanner(wb, { jenis: 'gagal', judul: 'Gagal tersimpan', pesan: j.pesan });
     } catch (e) {
       S.sibuk = false;
@@ -5777,7 +5819,10 @@ function layarDetailListing(isi, p) {
     }
     tombolKomisi.disabled = false;
   });
-  isi.append(judulBagian('Komisi'), el('div', { class: 'kartu' }, komisi.wadah, tombolKomisi));
+  isi.append(judulBagian('Bagi komisi untuk saya'),
+    el('div', { class: 'kartu' },
+      el('p', { class: 'kecil redup', text: 'Isi sesuai kesepakatan dengan agen. Jual dan sewa boleh beda.' }),
+      komisi.wadah, komisiSewa.wadah, tombolKomisi));
 
   // Yang cocok
   if (l.tipe === 'stok') {
@@ -6272,7 +6317,7 @@ function layarFormProperti(isi, p) {
     sertLain.wadah.classList.toggle('tersembunyi', v !== 'Lainnya');
     if (v === 'Lainnya') sertLain.isian.focus();
   }, true, 'baris-3');
-  const komisiJenis = grupPilihan('Komisi agen', 'Boleh kosong', [{ nilai: 'persen', label: 'Persen' }, { nilai: 'nominal', label: 'Rupiah' }],
+  const komisiJenis = grupPilihan('Komisi kalau terjual', 'Boleh kosong', [{ nilai: 'persen', label: 'Persen' }, { nilai: 'nominal', label: 'Rupiah' }],
     ubah ? (pr.komisi_jenis || null) : null, function (v) {
       komisiPersen.wadah.classList.toggle('tersembunyi', v !== 'persen');
       komisiRp.wadah.classList.toggle('tersembunyi', v !== 'nominal');
@@ -6281,6 +6326,16 @@ function layarFormProperti(isi, p) {
   const komisiRp = bidangRupiah('fKomisiRp', 'Besar komisi', '', ubah && pr.komisi_jenis === 'nominal' ? pr.komisi_nilai : '');
   komisiPersen.wadah.classList.toggle('tersembunyi', !(ubah && pr.komisi_jenis === 'persen'));
   komisiRp.wadah.classList.toggle('tersembunyi', !(ubah && pr.komisi_jenis === 'nominal'));
+  // 5.4: komisi sewa punya kotak sendiri, karena bagiannya sering beda dengan jual.
+  const komisiJenisSewa = grupPilihan('Komisi kalau disewakan', 'Boleh kosong', [{ nilai: 'persen', label: 'Persen' }, { nilai: 'nominal', label: 'Rupiah' }],
+    ubah ? (pr.komisi_jenis_sewa || null) : null, function (v) {
+      komisiPersenSewa.wadah.classList.toggle('tersembunyi', v !== 'persen');
+      komisiRpSewa.wadah.classList.toggle('tersembunyi', v !== 'nominal');
+    }, true);
+  const komisiPersenSewa = bidangAngka('fKomisiPSewa', 'Besar komisi sewa', '%', ubah && pr.komisi_jenis_sewa === 'persen' ? pr.komisi_nilai_sewa : '', true);
+  const komisiRpSewa = bidangRupiah('fKomisiRpSewa', 'Besar komisi sewa', '', ubah && pr.komisi_jenis_sewa === 'nominal' ? pr.komisi_nilai_sewa : '');
+  komisiPersenSewa.wadah.classList.toggle('tersembunyi', !(ubah && pr.komisi_jenis_sewa === 'persen'));
+  komisiRpSewa.wadah.classList.toggle('tersembunyi', !(ubah && pr.komisi_jenis_sewa === 'nominal'));
   // Fasilitas (4.6): ukuran tanah P x L, carport, listrik, sumber air, menghadap.
   const pjg = bidangAngka('fPanjang', 'Panjang tanah', 'm', ubah ? pr.panjang_tanah : '', true);
   const lbr = bidangAngka('fLebar', 'Lebar tanah', 'm', ubah ? pr.lebar_tanah : '', true);
@@ -6333,6 +6388,7 @@ function layarFormProperti(isi, p) {
       arah.wadah,
       sertifikat.wadah, sertLain.wadah,
       el('div', { class: 'kotak-komisi' }, komisiJenis.wadah, komisiPersen.wadah, komisiRp.wadah,
+        komisiJenisSewa.wadah, komisiPersenSewa.wadah, komisiRpSewa.wadah,
         el('p', { class: 'kecil redup catatan-komisi' }, ikon('perisai', 'ikon-mini'), 'Hanya untuk agen. Tidak pernah ikut dibagikan ke pembeli atau dicetak di PDF.'))));
 
   const cat = bidangTeks('fCatProp', 'Catatan', 'Boleh kosong', ubah ? pr.catatan : '', { maxlength: '1000' }, true);
@@ -6362,13 +6418,14 @@ function layarFormProperti(isi, p) {
     if (jenis.nilai() === 'Lainnya' && !teksLain) { jenisLain.salah('Ketik jenis propertinya.'); pertama = pertama || jenisLain; }
     const t = tawar.nilai();
     if (!t.dijual && !t.disewakan) { tawar.salah('Pilih Dijual atau Disewakan (boleh dua-duanya).'); pertama = pertama || tawar; }
-    [lt, lb, kt, km, komisiPersen, pjg, lbr].forEach(function (b) { if (!b.periksa()) { lipat.open = true; pertama = pertama || b; } });
+    [lt, lb, kt, km, komisiPersen, komisiPersenSewa, pjg, lbr].forEach(function (b) { if (!b.periksa()) { lipat.open = true; pertama = pertama || b; } });
     if (listrik.nilai() === 'lain' && !listrikKetik.periksa()) { lipat.open = true; pertama = pertama || listrikKetik; }
     if (t.dijual && !promoJual.periksa()) { pertama = pertama || promoJual; }
     if (t.disewakan && !promoSewa.periksa()) { pertama = pertama || promoSewa; }
     const teksSert = rapiJudul_(sertLain.isian.value, false);
     if (sertifikat.nilai() === 'Lainnya' && !teksSert) { sertLain.salah('Ketik jenis sertifikatnya.'); lipat.open = true; pertama = pertama || sertLain; }
     if (komisiJenis.nilai() === 'persen' && Number(komisiPersen.nilai()) > 100) { komisiPersen.salah('Komisi persen paling besar 100.'); lipat.open = true; pertama = pertama || komisiPersen; }
+    if (komisiJenisSewa.nilai() === 'persen' && Number(komisiPersenSewa.nilai()) > 100) { komisiPersenSewa.salah('Komisi persen paling besar 100.'); lipat.open = true; pertama = pertama || komisiPersenSewa; }
     if (pertama) {
       if (pertama.fokus) pertama.fokus(); else pertama.isian.focus();
       umumkan('Ada isian yang perlu diperbaiki.');
@@ -6376,6 +6433,7 @@ function layarFormProperti(isi, p) {
     }
     const nilaiJenis = jenis.nilai() === 'Lainnya' ? 'Lainnya: ' + teksLain : jenis.nilai();
     const kj = komisiJenis.nilai() || '';
+    const kjs = komisiJenisSewa.nilai() || '';
     const progresLama = ubah ? progresProp(pr) : '';
     const progresBaru = progres.nilai();
 
@@ -6395,6 +6453,7 @@ function layarFormProperti(isi, p) {
         harga_jual_promo: t.dijual ? promoJual.nilai() : '', harga_sewa_promo: t.disewakan ? promoSewa.nilai() : '',
         sertifikat: sertifikat.nilai() === 'Lainnya' ? 'Lainnya: ' + teksSert : (sertifikat.nilai() || ''),
         komisi_jenis: kj, komisi_nilai: kj === 'persen' ? komisiPersen.nilai() : kj === 'nominal' ? komisiRp.nilai() : '',
+        komisi_jenis_sewa: kjs, komisi_nilai_sewa: kjs === 'persen' ? komisiPersenSewa.nilai() : kjs === 'nominal' ? komisiRpSewa.nilai() : '',
         progres: progresBaru, id_klien_deal: progresBaru === 'Deal' || progresBaru === 'Sold' ? pilihDeal.value : '',
         catatan: rapiKalimat_(cat.isian.value)
       });
