@@ -1195,3 +1195,10 @@ body.layar-masuk .isi { max-width: none; padding: 0; }
 .drv-terisi .drv-isi { stroke: #C77A12; } .drv-terisi .drv-lingkar { color: #8A4F00; } .drv-terisi .drv-teks { color: var(--waspada-teks); }
 .drv-penuh { background: #FBE9D9; border-color: #E2A36B; }
 .drv-penuh .drv-isi { stroke: #B4530C; } .drv-penuh .drv-lingkar { color: #8A3A00; } .drv-penuh .drv-teks { color: #5A2A00; }
+
+/* ── v5.5: peringatan listing kembar (tampil di layar yang sama) ── */
+.kartu-kembar { background: var(--waspada-latar); border: 2px solid var(--waspada-garis); margin-top: 14px; }
+.kartu-kembar .judul-kartu { color: #6B3E00; }
+.kembar-tanya { font-size: 18px; line-height: 1.45; color: var(--waspada-teks); margin: 6px 0 12px; }
+.kembar-isi { display: flex; flex-direction: column; gap: 2px; background: var(--kartu); border: 1px solid var(--garis); border-radius: 18px; padding: 14px 16px; margin-bottom: 14px; }
+.kartu-kembar .tombol { width: 100%; margin-top: 10px; }

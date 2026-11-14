@@ -1,7 +1,7 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
-   Versi 5.4 — 5 November 2026. Butuh Code.gs 3.0. Baru: komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
+   Versi 5.5 — 14 November 2026. Butuh Code.gs 3.1. Baru: peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
    daftar panjang tampil bertahap saat digulir; Listing punya panjang x lebar, keterangan tambahan masuk ke catatan,
    umur listing; baris kecil di Beranda yang menunjukkan ukuran dan lama muat data.
    Versi 5.0 — 2 November 2026. Butuh Code.gs 2.5. Baru: menu Listing untuk info properti dari grup WhatsApp agen lain
@@ -94,7 +94,7 @@ const CONFIG = {
   NO_HP_PEMILIK: '0813 8279 9845',   // kaki gambar promo dan isian Nama dan HP agen
   NAMA_BANNER: 'Puji Tan',           // nama di gambar promo, kedua gaya (QR qr-wa.png dibuat dari nomor ini)
   FOTO_PER_HALAMAN: 6,        // foto per halaman di layar Bagikan (2 kolom x 3 baris)
-  VERSI_SERVER_MIN: '3.0'     // versi Code.gs yang dibutuhkan tampilan ini
+  VERSI_SERVER_MIN: '3.1'     // versi Code.gs yang dibutuhkan tampilan ini
 };
 
 /* ── Daftar tetap ─────────────────────────────────────────── */
@@ -5470,6 +5470,31 @@ function kartuListing(l) {
     el('span', { class: 'baris-chip' }, chip(l.status || 'Baru', l.status || 'Baru'), labelDesakListing(l) ? chip('desak', labelDesakListing(l)) : null, cocok));
 }
 
+/**
+ * 5.5: peringatan listing kembar. Tampil di layar yang sama, tidak pindah ke mana-mana,
+ * supaya hasil tempelan tidak hilang dan tidak ada tombol kembali yang membingungkan.
+ */
+function kartuKembar(d, aksiSama, aksiBeda) {
+  const l = d.listing;
+  const alasan = d.alasan === 'pesan' ? 'Pesan WhatsApp-nya sama persis dengan yang ini.'
+    : d.alasan === 'agen' ? 'Judulnya mirip dan agennya sama dengan yang ini.'
+    : 'Judulnya mirip dan lokasinya sama dengan yang ini.';
+  const agen = namaAgenListing(l);
+  const spesifikasi = ringkasListing(l);
+  return el('section', { class: 'kartu kartu-kembar', role: 'alert' },
+    el('h2', { class: 'judul-kartu' }, ikon('peringatan'), 'Sepertinya sudah pernah dimasukkan'),
+    el('p', { class: 'kembar-tanya', text: alasan + ' Apakah ini properti yang sama?' }),
+    el('div', { class: 'kembar-isi' },
+      el('span', { class: 'listing-judul', text: l.nama }),
+      l.lokasi ? el('span', { class: 'sub', text: l.lokasi }) : null,
+      spesifikasi ? el('span', { class: 'sub', text: spesifikasi }) : null,
+      el('span', { class: 'listing-harga', text: hargaListingTeks(l) }),
+      agen ? el('span', { class: 'sub', text: 'Agen: ' + agen }) : null,
+      el('span', { class: 'sub', text: 'Dimasukkan ' + (d.dibuat_pada ? formatTanggal(d.dibuat_pada) : 'sebelumnya') + ' · ' + (l.status || 'Baru') })),
+    tombol('tombol-kedua', 'silang', 'Ya, sama. Tidak jadi simpan', aksiSama),
+    tombol('tombol-utama', 'centang', 'Beda. Tetap simpan', aksiBeda));
+}
+
 /* ── Tempel dari WA ── */
 
 async function tempelDariWa() {
@@ -5650,7 +5675,17 @@ function layarFormListing(isi, p) {
       el('summary', {}, ikon('pesan'), el('span', { class: 'tengah' }, el('span', { class: 'judul-lipat', text: 'Pesan asli' }), el('span', { class: 'sub-lipat', text: 'Ketuk untuk membandingkan' }))),
       el('div', { class: 'lipat-isi' }, el('p', { class: 'pre-line kecil', text: teksAsli }))));
   }
-  isi.append(tombolSimpan);
+  const wadahKembar = el('div');
+  isi.append(wadahKembar, tombolSimpan);
+  let abaikanKembar = false;   // jadi true hanya kalau agen menjawab "beda, tetap simpan"
+  // Begitu ada isian yang diubah, peringatan kembar dibuang dan tombol Simpan muncul lagi,
+  // supaya tidak ada jalan buntu kalau agen memilih membetulkan isiannya dulu.
+  function buangPeringatanKembar() {
+    if (!wadahKembar.firstChild) return;
+    kosongkan(wadahKembar);
+    tombolSimpan.classList.remove('tersembunyi');
+  }
+  ['input', 'change'].forEach(function (e) { isi.addEventListener(e, buangPeringatanKembar); });
 
   /** Mengunggah gambar yang dipilih sesudah listing tersimpan. Hasil: jumlah gambar yang gagal. */
   async function unggahGambarBaru() {
@@ -5709,10 +5744,29 @@ function layarFormListing(isi, p) {
       catatan: rapiKalimat_(catatan.isian.value)
     };
     if (!ubah) kirim.teks_asli = teksAsli;
+    if (abaikanKembar) kirim.abaikan_kembar = true;
+    kosongkan(wadahKembar);
     tombolSimpanSibuk(tombolSimpan, true);
     S.sibuk = true;
     try {
       const j = await panggil('simpanListing', kirim);
+      if (!j.ok && j.kode === 'KEMBAR') {
+        S.sibuk = false;
+        tombolSimpanSibuk(tombolSimpan, false);
+        kosongkan(tombolSimpan); tombolSimpan.append(ikon('centang'), el('span', { text: 'Simpan listing' }));
+        tombolSimpan.classList.add('tersembunyi');   // sementara: yang dipakai tombol di kartu peringatan
+        wadahKembar.append(kartuKembar(j.data, function () {
+          S.bannerBerikut = { jenis: 'info', judul: 'Tidak jadi disimpan', pesan: 'Listing ini dianggap sama dengan yang sudah ada.' };
+          buka('listing', {}, { ganti: true });
+        }, function () {
+          abaikanKembar = true;
+          tombolSimpan.classList.remove('tersembunyi');
+          simpan();
+        }));
+        wadahKembar.scrollIntoView({ block: 'center' });
+        umumkan('Sepertinya listing ini sudah pernah dimasukkan.');
+        return;
+      }
       if (j.ok) {
         S.data.listing = S.data.listing || [];
         simpanKeDaftar(S.data.listing, 'id_listing', j.data.listing);
