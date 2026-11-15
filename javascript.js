@@ -1,7 +1,7 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
-   Versi 5.5 — 14 November 2026. Butuh Code.gs 3.1. Baru: peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
+   Versi 5.8 — 15 November 2026. Butuh Code.gs 3.1. Baru: nama agen seragam jadi "Puji Tan" di seluruh aplikasi, sapaan umum jadi "Semangat pagi investor properti!", dan pesan ke agen lain memakai nama dan kantor lengkap. Sebelumnya (5.6): sapaan pesan WhatsApp diperbaiki (gambar promo tidak lagi menyapa penjual) dan foto dikecilkan ke 1280 px supaya unggah lebih ringan. Sebelumnya (5.5): peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
    daftar panjang tampil bertahap saat digulir; Listing punya panjang x lebar, keterangan tambahan masuk ke catatan,
    umur listing; baris kecil di Beranda yang menunjukkan ukuran dan lama muat data.
    Versi 5.0 — 2 November 2026. Butuh Code.gs 2.5. Baru: menu Listing untuk info properti dari grup WhatsApp agen lain
@@ -80,8 +80,8 @@ const CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbzoqgHmIXoUB4V3qbhN2vuQCW7R-1Bv2fcAJe06bqbkAJYFHpNGQ4y2bg0jAwjDvN4/exec',
   GOOGLE_CLIENT_ID: '76556701841-t7gj13v1g4dvser39d2cs6e9f5qu2lbh.apps.googleusercontent.com',
   MODE: 'uji',                // 'uji' menampilkan pita VERSI UJI; 'asli' tidak menampilkan apa pun
-  NAMA_PEMILIK: 'Pudji',      // nama agen, tampil di sapaan, layar masuk, dan pesan WhatsApp
-  FOTO_SISI_MAKS: 1600,       // sisi terpanjang foto setelah dikecilkan (px)
+  NAMA_PEMILIK: 'Puji Tan',   // nama agen, tampil di sapaan, layar masuk, dan pesan WhatsApp
+  FOTO_SISI_MAKS: 1280,       // sisi terpanjang foto setelah dikecilkan (px). 5.6: dari 1600, supaya unggah di HP lebih ringan
   FOTO_KUALITAS: 0.7,         // kualitas JPEG (0 sampai 1)
   MINI_SISI: 320,             // sisi terpanjang foto kecil untuk daftar (px)
   BATAS_WAKTU_MS: 60000,      // batas tunggu panggilan biasa
@@ -93,6 +93,9 @@ const CONFIG = {
   MARKA_TEKS: 'GADING PRO',   // tulisan watermark di tengah KTP, NPWP, dan Sertifikat (foto properti tanpa watermark)
   NO_HP_PEMILIK: '0813 8279 9845',   // kaki gambar promo dan isian Nama dan HP agen
   NAMA_BANNER: 'Puji Tan',           // nama di gambar promo, kedua gaya (QR qr-wa.png dibuat dari nomor ini)
+  SAPAAN_WA: 'Semangat pagi',        // pembuka pesan WhatsApp ke pembeli
+  IDENTITAS_WA: 'Puji Tan - GP Kemang',   // cara memperkenalkan diri ke agen atau broker lain
+  SEBUTAN_PEMBELI: 'investor properti',   // dipakai kalau pesannya tidak ditujukan ke satu orang tertentu
   FOTO_PER_HALAMAN: 6,        // foto per halaman di layar Bagikan (2 kolom x 3 baris)
   VERSI_SERVER_MIN: '3.1'     // versi Code.gs yang dibutuhkan tampilan ini
 };
@@ -1930,7 +1933,6 @@ function garisBundar(c, x, y, w, h, r) {
 function layarPromo(isi, p) {
   const pr = p.id ? cariProperti(p.id) : null;
   if (!pr) return tidakAda();
-  const k = cariKlien(pr.id_klien);
   kepala({ judul: 'Gambar Promo' });
   const st = S.layar;
   const fotos = fotoProperti(pr);
@@ -2031,7 +2033,8 @@ function layarPromo(isi, p) {
     if (!(navigator.canShare && navigator.canShare({ files: files }))) { unduh(); return; }
     sibuk(tombolBagi, true, 'Membuka menu...', 'Bagikan ke WhatsApp');
     try {
-      await navigator.share({ files: files, text: teksPromosi([pr], k) });
+      // Gambar promo disebar ke calon pembeli, jadi tidak boleh menyapa pemilik propertinya.
+      await navigator.share({ files: files, text: teksPromosi([pr], null) });
     } catch (e) {
       if (!e || e.name !== 'AbortError') unduh();
     } finally {
@@ -5063,7 +5066,8 @@ function namaAgenListing(l) {
 }
 
 function pesanWaListing(l) {
-  const sapa = 'Halo' + (l.agen_nama ? ' ' + l.agen_nama : '') + ', saya ' + CONFIG.NAMA_PEMILIK + '. ';
+  // 5.7: ke sesama agen, perkenalkan diri lengkap dengan kantornya, bukan nama panggilan saja.
+  const sapa = 'Halo' + (l.agen_nama ? ' ' + l.agen_nama : '') + ', saya ' + CONFIG.IDENTITAS_WA + '. ';
   if (l.tipe === 'dicari') return sapa + 'Soal yang dicari "' + l.nama + '": saya ada properti yang mungkin cocok. Boleh saya kirim infonya?';
   return sapa + 'Listing "' + l.nama + '" masih tersedia? Saya ada klien yang tertarik.';
 }
@@ -6741,8 +6745,12 @@ function lepasBagikan() { /* foto besar tetap di memori sementara untuk dipakai 
 
 function teksPromosi(props, untuk) {
   const baris = [];
+  // 5.6: pesan ini selalu ditujukan ke pembeli, bukan ke pemilik propertinya.
+  // Tanpa penerima tertentu (misalnya gambar promo yang disebar), dipakai sapaan umum.
   if (untuk) {
-    baris.push('Halo ' + namaSapaan(untuk.nama) + ', berikut ' + (props.length > 1 ? 'beberapa properti' : 'properti') + ' yang mungkin cocok:', '');
+    baris.push(CONFIG.SAPAAN_WA + ' ' + namaSapaan(untuk.nama) + ', berikut ' + (props.length > 1 ? 'beberapa properti' : 'properti') + ' yang mungkin cocok:', '');
+  } else {
+    baris.push(CONFIG.SAPAAN_WA + ' ' + CONFIG.SEBUTAN_PEMBELI + '!', '');
   }
   props.forEach(function (pr, i) {
     baris.push((props.length > 1 ? (i + 1) + '. ' : '') + '*' + pr.nama_properti + '*');
