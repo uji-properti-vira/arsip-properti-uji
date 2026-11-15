@@ -643,9 +643,11 @@ body.layar-gelap .kepala { display: none; }
 .batang span { display: block; height: 100%; width: 40%; border-radius: 9999px; background: var(--utama); animation: jalan 1.4s ease-in-out infinite; }
 @keyframes jalan { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
 
-.bingkai-foto { background: #22231F; border-radius: 20px; overflow: auto; max-height: 68vh; -webkit-overflow-scrolling: touch; }
-.bingkai-foto img { display: block; width: 100%; height: auto; }
-.bingkai-foto.besar img { width: 250%; max-width: none; }
+.bingkai-foto { background: #22231F; border-radius: 20px; overflow: hidden; height: min(62vh, 520px); display: flex; align-items: center; justify-content: center; -webkit-overflow-scrolling: touch; }
+.bingkai-foto > .kosong { margin: 0; }
+.bingkai-foto img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.bingkai-foto.besar { display: block; overflow: auto; }
+.bingkai-foto.besar img { width: 250%; max-width: none; max-height: none; }
 .teks-terang { color: #F7F4EE; }
 
 .petunjuk {
@@ -1218,3 +1220,8 @@ body.layar-masuk .isi { max-width: none; padding: 0; }
 .geser-kiri { left: 10px; }
 .geser-kanan { right: 10px; }
 .gambar-geser .geser-tombol .ikon { width: 26px; height: 26px; stroke-width: 2.2; }
+
+/* v5.11: foto kecil tampil dulu, foto tajam menimpa di atasnya */
+.geser-slide { position: relative; }
+.geser-slide.ada-foto > .ikon { display: none; }
+.geser-slide img.penuh { position: absolute; inset: 0; }

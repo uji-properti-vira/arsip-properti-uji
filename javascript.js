@@ -1,7 +1,7 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
-   Versi 5.10 — 15 November 2026. Butuh Code.gs 3.1. Baru: dokumen PDF (SHM, PBB, dll.) bisa diunggah, diubah jadi gambar per halaman di HP. Butuh file pdfjs.js dan pdfjs.worker.js di GitHub. Sebelumnya (5.9): foto di rincian properti bisa digeser kiri-kanan. Sebelumnya (5.8): nama agen seragam jadi "Puji Tan" di seluruh aplikasi, sapaan umum jadi "Semangat pagi investor properti!", dan pesan ke agen lain memakai nama dan kantor lengkap. Sebelumnya (5.6): sapaan pesan WhatsApp diperbaiki (gambar promo tidak lagi menyapa penjual) dan foto dikecilkan ke 1280 px supaya unggah lebih ringan. Sebelumnya (5.5): peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
+   Versi 5.11 — 15 November 2026. Butuh Code.gs 3.1. Baru: kotak penampil foto tingginya tetap (tombol tidak naik-turun) dan geser foto lebih ringan (foto kecil tampil dulu, foto tajam hanya untuk yang sedang dilihat). Sebelumnya (5.10): dokumen PDF (SHM, PBB, dll.) bisa diunggah, diubah jadi gambar per halaman di HP. Butuh file pdfjs.js dan pdfjs.worker.js di GitHub. Sebelumnya (5.9): foto di rincian properti bisa digeser kiri-kanan. Sebelumnya (5.8): nama agen seragam jadi "Puji Tan" di seluruh aplikasi, sapaan umum jadi "Semangat pagi investor properti!", dan pesan ke agen lain memakai nama dan kantor lengkap. Sebelumnya (5.6): sapaan pesan WhatsApp diperbaiki (gambar promo tidak lagi menyapa penjual) dan foto dikecilkan ke 1280 px supaya unggah lebih ringan. Sebelumnya (5.5): peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
    daftar panjang tampil bertahap saat digulir; Listing punya panjang x lebar, keterangan tambahan masuk ke catatan,
    umur listing; baris kecil di Beranda yang menunjukkan ukuran dan lama muat data.
    Versi 5.0 — 2 November 2026. Butuh Code.gs 2.5. Baru: menu Listing untuk info properti dari grup WhatsApp agen lain
@@ -1583,24 +1583,27 @@ function sliderFoto(pr, foto, st) {
   jalur.append.apply(jalur, slides);
   wadah.append(jalur);
 
+  // Foto kecil (sudah tersimpan di HP) tampil seketika; foto tajam hanya diambil untuk foto yang sedang dilihat.
+  slides.forEach(function (s) { pasangMini(s, s.dataset.id); });
   const dimuat = {};
   function muat(i) {
     if (i < 0 || i >= slides.length || dimuat[i]) return;
     dimuat[i] = true;
     urlFoto(slides[i].dataset.id).then(function (url) {
       if (S.layar !== st) return;
-      kosongkan(slides[i]);
-      slides[i].append(el('img', { src: url, alt: 'Foto ' + (i + 1) + ' dari ' + foto.length + ', ' + pr.nama_properti }));
+      const lama = slides[i].querySelector('img.penuh');
+      if (lama) lama.remove();
+      slides[i].append(el('img', { class: 'penuh', src: url, alt: 'Foto ' + (i + 1) + ' dari ' + foto.length + ', ' + pr.nama_properti }));
+      slides[i].classList.add('ada-foto', 'tajam');
       wadah.classList.add('ada-foto');
     }).catch(function () {
       dimuat[i] = false;
-      if (S.layar !== st) return;
+      if (S.layar !== st || slides[i].classList.contains('ada-foto')) return;
       kosongkan(slides[i]);
       slides[i].append(el('span', { class: 'tulisan-kecil', text: 'Foto belum bisa dibuka' }));
     });
   }
   muat(0);
-  muat(1);
 
   if (foto.length > 1) {
     const geser = function (arah) { jalur.scrollBy({ left: arah * jalur.clientWidth, behavior: 'smooth' }); };
@@ -1613,8 +1616,8 @@ function sliderFoto(pr, foto, st) {
       jeda = setTimeout(function () {
         const i = Math.max(0, Math.min(foto.length - 1, Math.round(jalur.scrollLeft / Math.max(1, jalur.clientWidth))));
         nomor.textContent = (i + 1) + ' dari ' + foto.length + ' foto';
-        muat(i); muat(i + 1); muat(i - 1);
-      }, 90);
+        muat(i);
+      }, 250);
     });
   }
   wadah.append(nomor);
