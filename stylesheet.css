@@ -1202,3 +1202,19 @@ body.layar-masuk .isi { max-width: none; padding: 0; }
 .kembar-tanya { font-size: 18px; line-height: 1.45; color: var(--waspada-teks); margin: 6px 0 12px; }
 .kembar-isi { display: flex; flex-direction: column; gap: 2px; background: var(--kartu); border: 1px solid var(--garis); border-radius: 18px; padding: 14px 16px; margin-bottom: 14px; }
 .kartu-kembar .tombol { width: 100%; margin-top: 10px; }
+
+/* ── v5.9: foto rincian properti yang bisa digeser ── */
+.gambar-geser { display: block; }
+.geser-jalur { display: flex; height: 100%; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+.geser-jalur::-webkit-scrollbar { display: none; }
+.geser-slide { flex: 0 0 100%; scroll-snap-align: center; height: 100%; display: flex; align-items: center; justify-content: center; }
+.geser-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.geser-tombol {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 48px; height: 48px; border-radius: 9999px; border: none; padding: 0;
+  background: rgba(20, 22, 20, 0.58); color: #fff; display: grid; place-items: center; cursor: pointer;
+}
+.geser-tombol:hover { background: rgba(20, 22, 20, 0.78); }
+.geser-kiri { left: 10px; }
+.geser-kanan { right: 10px; }
+.gambar-geser .geser-tombol .ikon { width: 26px; height: 26px; stroke-width: 2.2; }

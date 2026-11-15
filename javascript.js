@@ -1,7 +1,7 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
-   Versi 5.8 — 15 November 2026. Butuh Code.gs 3.1. Baru: nama agen seragam jadi "Puji Tan" di seluruh aplikasi, sapaan umum jadi "Semangat pagi investor properti!", dan pesan ke agen lain memakai nama dan kantor lengkap. Sebelumnya (5.6): sapaan pesan WhatsApp diperbaiki (gambar promo tidak lagi menyapa penjual) dan foto dikecilkan ke 1280 px supaya unggah lebih ringan. Sebelumnya (5.5): peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
+   Versi 5.10 — 15 November 2026. Butuh Code.gs 3.1. Baru: dokumen PDF (SHM, PBB, dll.) bisa diunggah, diubah jadi gambar per halaman di HP. Butuh file pdfjs.js dan pdfjs.worker.js di GitHub. Sebelumnya (5.9): foto di rincian properti bisa digeser kiri-kanan. Sebelumnya (5.8): nama agen seragam jadi "Puji Tan" di seluruh aplikasi, sapaan umum jadi "Semangat pagi investor properti!", dan pesan ke agen lain memakai nama dan kantor lengkap. Sebelumnya (5.6): sapaan pesan WhatsApp diperbaiki (gambar promo tidak lagi menyapa penjual) dan foto dikecilkan ke 1280 px supaya unggah lebih ringan. Sebelumnya (5.5): peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
    daftar panjang tampil bertahap saat digulir; Listing punya panjang x lebar, keterangan tambahan masuk ke catatan,
    umur listing; baris kecil di Beranda yang menunjukkan ukuran dan lama muat data.
    Versi 5.0 — 2 November 2026. Butuh Code.gs 2.5. Baru: menu Listing untuk info properti dari grup WhatsApp agen lain
@@ -1558,6 +1558,67 @@ function gambarProp(pr, besar) {
     wadah.append(ikon('rumah'));
   }
   const lencana = labelFoto(pr, besar);
+  if (lencana) wadah.append(lencana);
+  if (g === 'Deal') wadah.append(el('span', { class: 'pita pita-deal', text: 'DEAL' }));
+  if (g === 'Sold') wadah.append(el('span', { class: 'pita pita-sold', text: 'SOLD' }));
+  return wadah;
+}
+
+/**
+ * 5.9: foto properti di layar rincian bisa digeser kiri-kanan.
+ * Fotonya diambil satu per satu sambil digeser, bukan enam-enamnya sekaligus,
+ * supaya layar tetap cepat terbuka dan kuota tidak terbuang untuk foto yang tidak dilihat.
+ */
+function sliderFoto(pr, foto, st) {
+  const g = progresProp(pr);
+  const wadah = el('div', { class: 'gambar-utama gambar-geser' + (g === 'Sold' || g === 'Agen lain' ? ' pudar' : '') });
+  const jalur = el('div', { class: 'geser-jalur' });
+  const nomor = el('span', { class: 'keterangan-gambar', role: 'status', 'aria-live': 'polite',
+    text: foto.length > 1 ? '1 dari ' + foto.length + ' foto' : '1 foto' });
+  const slides = foto.map(function (f) {
+    const s = el('div', { class: 'geser-slide' }, ikon('rumah'));
+    s.dataset.id = f.id_dokumen;
+    return s;
+  });
+  jalur.append.apply(jalur, slides);
+  wadah.append(jalur);
+
+  const dimuat = {};
+  function muat(i) {
+    if (i < 0 || i >= slides.length || dimuat[i]) return;
+    dimuat[i] = true;
+    urlFoto(slides[i].dataset.id).then(function (url) {
+      if (S.layar !== st) return;
+      kosongkan(slides[i]);
+      slides[i].append(el('img', { src: url, alt: 'Foto ' + (i + 1) + ' dari ' + foto.length + ', ' + pr.nama_properti }));
+      wadah.classList.add('ada-foto');
+    }).catch(function () {
+      dimuat[i] = false;
+      if (S.layar !== st) return;
+      kosongkan(slides[i]);
+      slides[i].append(el('span', { class: 'tulisan-kecil', text: 'Foto belum bisa dibuka' }));
+    });
+  }
+  muat(0);
+  muat(1);
+
+  if (foto.length > 1) {
+    const geser = function (arah) { jalur.scrollBy({ left: arah * jalur.clientWidth, behavior: 'smooth' }); };
+    wadah.append(
+      el('button', { type: 'button', class: 'geser-tombol geser-kiri', 'aria-label': 'Foto sebelumnya', onclick: function () { geser(-1); } }, ikon('kiri')),
+      el('button', { type: 'button', class: 'geser-tombol geser-kanan', 'aria-label': 'Foto berikutnya', onclick: function () { geser(1); } }, ikon('kanan')));
+    let jeda = null;
+    jalur.addEventListener('scroll', function () {
+      clearTimeout(jeda);
+      jeda = setTimeout(function () {
+        const i = Math.max(0, Math.min(foto.length - 1, Math.round(jalur.scrollLeft / Math.max(1, jalur.clientWidth))));
+        nomor.textContent = (i + 1) + ' dari ' + foto.length + ' foto';
+        muat(i); muat(i + 1); muat(i - 1);
+      }, 90);
+    });
+  }
+  wadah.append(nomor);
+  const lencana = labelFoto(pr, true);
   if (lencana) wadah.append(lencana);
   if (g === 'Deal') wadah.append(el('span', { class: 'pita pita-deal', text: 'DEAL' }));
   if (g === 'Sold') wadah.append(el('span', { class: 'pita pita-sold', text: 'SOLD' }));
@@ -3380,19 +3441,12 @@ function layarProperti(isi, p) {
 
   // Foto utama: foto properti terbaru bila ada, selain itu ilustrasi. Pita DEAL/SOLD ikut tampil.
   const fotoProp = fotoProperti(pr);
-  const gambar = gambarProp(pr, true);
-  const keterangan = el('span', { class: 'keterangan-gambar', text: fotoProp.length ? 'Membuka foto...' : 'Belum ada foto properti' });
-  gambar.append(keterangan);
-  isi.append(gambar);
   if (fotoProp.length) {
-    urlFoto(fotoProp[0].id_dokumen).then(function (url) {
-      if (S.layar !== st) return;
-      const lama = gambar.querySelector('img');
-      if (lama) lama.remove();
-      gambar.prepend(el('img', { src: url, alt: 'Foto ' + pr.nama_properti }));
-      gambar.classList.add('ada-foto');
-      keterangan.textContent = fotoProp.length + ' foto';
-    }).catch(function () { keterangan.textContent = 'Foto belum bisa dibuka'; });
+    isi.append(sliderFoto(pr, fotoProp, st));
+  } else {
+    const gambar = gambarProp(pr, true);
+    gambar.append(el('span', { class: 'keterangan-gambar', text: 'Belum ada foto properti' }));
+    isi.append(gambar);
   }
 
   isi.append(el('h2', { class: 'judul-prop', text: pr.nama_properti }));
@@ -3530,6 +3584,72 @@ function layarPilihTujuan(isi, p) {
 }
 
 /* ════════════════════════════════════════════════════════════
+   PDF -> GAMBAR (5.10)
+   SHM, PBB, dan dokumen lain berbentuk PDF diubah di HP menjadi satu gambar per halaman.
+   Sesudah itu gambar-gambarnya masuk jalur yang sama persis dengan foto biasa:
+   dikecilkan, diberi watermark (KTP/NPWP/Sertifikat), punya gambar kecil, dan ikut Cetak PDF.
+   Program pembacanya (pdfjs.js, dari Mozilla) baru diunduh saat pertama kali memilih PDF.
+   ════════════════════════════════════════════════════════════ */
+
+const PDF_HALAMAN_MAKS = 10;   // paling banyak halaman yang diambil dari satu PDF
+let PDFJS_JANJI = null;
+
+function muatPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (PDFJS_JANJI) return PDFJS_JANJI;
+  PDFJS_JANJI = new Promise(function (ok, gagal) {
+    const s = document.createElement('script');
+    s.src = 'pdfjs.js';
+    s.onload = function () {
+      if (!window.pdfjsLib) { PDFJS_JANJI = null; gagal(new Error('pdfjs')); return; }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs.worker.js';
+      ok(window.pdfjsLib);
+    };
+    s.onerror = function () { PDFJS_JANJI = null; s.remove(); gagal(new Error('pdfjs')); };
+    document.head.append(s);
+  });
+  return PDFJS_JANJI;
+}
+
+function filePdf(f) { return !!f && (f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '')); }
+
+/**
+ * Satu file PDF -> gambar JPEG per halaman (latar putih).
+ * sisa: tempat yang masih tersedia. Hasil: { gambar: [Blob], lewat: halaman yang tidak diambil }.
+ */
+async function pdfKeGambar(file, sisa, kabar) {
+  const lib = await muatPdfJs();
+  const data = new Uint8Array(await file.arrayBuffer());
+  const dok = await lib.getDocument({ data: data, isEvalSupported: false }).promise;
+  const total = dok.numPages;
+  const n = Math.max(0, Math.min(total, PDF_HALAMAN_MAKS, sisa));
+  const gambar = [];
+  try {
+    for (let i = 1; i <= n; i++) {
+      if (kabar) kabar(i, n);
+      const hal = await dok.getPage(i);
+      const v1 = hal.getViewport({ scale: 1 });
+      const v = hal.getViewport({ scale: 2000 / Math.max(v1.width, v1.height) });
+      const c = document.createElement('canvas');
+      c.width = Math.round(v.width);
+      c.height = Math.round(v.height);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff';   // halaman transparan jadi putih, bukan hitam
+      ctx.fillRect(0, 0, c.width, c.height);
+      await hal.render({ canvasContext: ctx, viewport: v }).promise;
+      gambar.push(await new Promise(function (ok, gagal) {
+        c.toBlob(function (b) { if (b) ok(b); else gagal(new Error('gambar')); }, 'image/jpeg', 0.9);
+      }));
+      c.width = 0; c.height = 0;
+      hal.cleanup();
+    }
+  } finally {
+    dok.destroy();
+  }
+  return { gambar: gambar, lewat: total - n };
+}
+
+/* ════════════════════════════════════════════════════════════
    LAYAR: FOTO DOKUMEN (tampilan kamera)
    Tombol membuka kamera bawaan HP. Foto dikecilkan di HP, disimpan dulu di HP
    (supaya tidak hilang), lalu diperiksa di layar Simpan Dokumen sebelum dikirim.
@@ -3547,11 +3667,14 @@ function layarFoto(isi, p) {
 
   const kamera = el('input', { type: 'file', accept: 'image/*', capture: 'environment', class: 'tersembunyi', tabindex: '-1', 'aria-hidden': 'true' });
   const galeri = el('input', { type: 'file', accept: 'image/*', multiple: true, class: 'tersembunyi', tabindex: '-1', 'aria-hidden': 'true' });
+  const masukPdf = el('input', { type: 'file', accept: 'application/pdf,.pdf', multiple: true, class: 'tersembunyi', tabindex: '-1', 'aria-hidden': 'true' });
   const pesan = el('div');
   const tombolKamera = el('button', { type: 'button', class: 'sumber sumber-utama', onclick: function () { kamera.value = ''; kamera.click(); } },
     ikon('kamera', 'ikon-besar'), el('span', { text: 'Pakai Kamera' }));
   const tombolGaleri = el('button', { type: 'button', class: 'sumber', onclick: function () { galeri.value = ''; galeri.click(); } },
     ikon('gambar', 'ikon-besar'), el('span', { text: 'Pilih dari Galeri (bisa banyak)' }));
+  const tombolPdf = el('button', { type: 'button', class: 'sumber', onclick: function () { masukPdf.value = ''; masukPdf.click(); } },
+    ikon('dokumen', 'ikon-besar'), el('span', { text: 'Pilih file PDF (SHM, PBB, dll.)' }));
 
   const ruang = el('div', { class: 'kamera' },
     el('div', { class: 'kamera-atas' },
@@ -3565,8 +3688,8 @@ function layarFoto(isi, p) {
       ikon('kartu'),
       el('p', { text: 'Pastikan tulisan di dokumen terlihat jelas.' }),
       el('p', { class: 'kecil', text: 'Dari galeri bisa memilih beberapa foto sekaligus. Jenis tiap foto diatur di layar berikutnya.' })),
-    el('div', { class: 'kamera-bawah' }, tombolKamera, tombolGaleri),
-    kamera, galeri);
+    el('div', { class: 'kamera-bawah' }, tombolKamera, tombolGaleri, tombolPdf),
+    kamera, galeri, masukPdf);
   isi.append(ruang);
   sisipBanner(pesan);
 
@@ -3579,16 +3702,54 @@ function layarFoto(isi, p) {
 
   kamera.addEventListener('change', function () { siapkan(kamera.files); });
   galeri.addEventListener('change', function () { siapkan(galeri.files); });
+  masukPdf.addEventListener('change', function () { siapkan(masukPdf.files); });
 
   async function siapkan(daftarFile) {
-    const file = Array.prototype.slice.call(daftarFile || []);
+    let file = Array.prototype.slice.call(daftarFile || []);
     kamera.value = '';
     galeri.value = '';
+    masukPdf.value = '';
     if (!file.length) return;
     if (S.foto && (S.foto.id_klien !== k.id_klien || !jumlahFotoTertunda())) lepasFoto();
     if (!S.foto) S.foto = { id_klien: k.id_klien, konteks: '', tujuan: undefined, items: [] };
     const f = S.foto;
     f.konteks = pr ? pr.id_properti : '';
+    // 5.10: PDF dipecah jadi gambar per halaman lebih dulu. Sesudah ini semuanya diperlakukan
+    // sama persis seperti foto: dikecilkan, diberi watermark saat disimpan, dan ikut Cetak PDF.
+    let pdfGagal = 0, pdfKunci = 0, pdfLewat = 0;
+    // Halaman dari PDF tidak pernah diawali sebagai "Foto properti": kalau lupa diganti, SHM bisa
+    // tersimpan tanpa watermark dan ikut tersebar di gambar promo. Bawaannya jenis yang ber-watermark.
+    const dariPdf = new WeakSet();
+    const jenisPdf = pr ? 'Sertifikat' : 'KTP';
+    if (file.some(filePdf)) {
+      tampilMemuat('Membuka PDF...');
+      const hasilFile = [];
+      for (let b = 0; b < file.length; b++) {
+        const berkas = file[b];
+        if (!filePdf(berkas)) { hasilFile.push(berkas); continue; }
+        try {
+          const r = await pdfKeGambar(berkas, FOTO_BATCH_MAKS - f.items.length - hasilFile.length, function (i, n) {
+            ubahTeksMemuat('Membuka PDF, halaman ' + i + ' dari ' + n + '...');
+          });
+          r.gambar.forEach(function (g) { dariPdf.add(g); hasilFile.push(g); });
+          pdfLewat += r.lewat;
+        } catch (e) {
+          if (e && e.name === 'PasswordException') pdfKunci++;
+          else pdfGagal++;
+        }
+      }
+      tutupMemuat();
+      if (S.layar !== st) return;
+      file = hasilFile;
+      if (!file.length) {
+        if (!f.items.length) lepasFoto();
+        kosongkan(pesan);
+        pesan.append(buatBanner({ jenis: 'gagal', judul: 'PDF tidak bisa dibuka',
+          pesan: pdfKunci ? 'PDF ini dikunci kata sandi. Buka kuncinya dulu, atau screenshot halamannya lalu pilih dari Galeri.'
+            : 'Coba screenshot halamannya, lalu pilih dari Galeri.' }));
+        return;
+      }
+    }
     const ruangSisa = Math.max(0, FOTO_BATCH_MAKS - f.items.length);
     const dipakai = file.slice(0, ruangSisa);
     const terlalu = file.length - dipakai.length;
@@ -3603,7 +3764,8 @@ function layarFoto(isi, p) {
         try { mini = await buatMini(hasil.blob); } catch (e) { mini = ''; }
         f.items.push({
           idUnggahan: idBaru('u'), base64: base64, url: URL.createObjectURL(hasil.blob), ukuran: hasil.blob.size,
-          jenis: jenisAwal, judul: jenisAwal === 'Lainnya' ? (p.judul || '') : '', tersimpan: false, terkunci: false, galat: '', mini: mini
+          jenis: dariPdf.has(dipakai[i]) ? jenisPdf : jenisAwal,
+          judul: !dariPdf.has(dipakai[i]) && jenisAwal === 'Lainnya' ? (p.judul || '') : '', tersimpan: false, terkunci: false, galat: '', mini: mini
         });
       } catch (e) {
         gagalBaca++;
@@ -3621,6 +3783,9 @@ function layarFoto(isi, p) {
     }
     const catatan = [];
     if (gagalBaca) catatan.push(gagalBaca + ' foto tidak bisa dibaca dan dilewati.');
+    if (pdfKunci) catatan.push(pdfKunci + ' PDF dikunci kata sandi dan dilewati.');
+    if (pdfGagal) catatan.push(pdfGagal + ' PDF tidak bisa dibuka dan dilewati.');
+    if (pdfLewat) catatan.push(pdfLewat + ' halaman PDF tidak ikut (paling banyak ' + PDF_HALAMAN_MAKS + ' halaman per PDF, ' + FOTO_BATCH_MAKS + ' gambar sekali simpan).');
     if (terlalu) catatan.push('Paling banyak ' + FOTO_BATCH_MAKS + ' foto sekali simpan; ' + terlalu + ' foto tidak ikut.');
     if (catatan.length) S.bannerBerikut = { jenis: 'waspada', judul: 'Sebagian foto tidak diambil', pesan: catatan.join(' ') };
     buka('simpanFoto', { id_klien: k.id_klien, id_properti: pr ? pr.id_properti : '' });
