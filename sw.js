@@ -9,7 +9,7 @@
    langsung terpasang. Simpanan hanya dipakai bila internet mati atau terlalu lambat.
    ============================================================ */
 
-const VERSI = 'app-v42';
+const VERSI = 'app-v43';
 const FILE_TAMPILAN = [
   './',
   './index.html',

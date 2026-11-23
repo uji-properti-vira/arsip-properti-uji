@@ -1689,118 +1689,15 @@ function tulisanMuat(c, teks, px, bobot, lebar) {
  */
 async function buatGambarPromo(pr, idFoto, pilih) {
   if (pilih.gaya === 'banner') return buatGambarBanner(pr, idFoto, pilih);
-  const W = PROMO_W, H = PROMO_H;
-  const kanvas = document.createElement('canvas');
-  kanvas.width = W;
-  kanvas.height = H;
-  const c = kanvas.getContext('2d');
-  c.fillStyle = '#B8AE97';
-  c.fillRect(0, 0, W, H);
-
-  const x = await ambilFotoBesar(idFoto, 'bagikan');
-  const img = new Image();
-  img.src = x.url;
-  await img.decode();
-  const s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-  const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+  // 5.12: gaya Polos untuk sesama agen (co-broke): foto saja, dipotong 4:5, tanpa tulisan dan logo.
+  const W = PROMO_W, H = PROMO_H, kanvas = document.createElement('canvas');
+  kanvas.width = W; kanvas.height = H;
+  const c = kanvas.getContext('2d'), x = await ambilFotoBanner(idFoto), img = new Image();
+  img.src = x.url; await img.decode();
+  const sk = Math.max(W / img.naturalWidth, H / img.naturalHeight), dw = img.naturalWidth * sk, dh = img.naturalHeight * sk;
   c.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-
-  // Pita gelap di atas dan bawah supaya tulisan terbaca.
-  const atas = c.createLinearGradient(0, 0, 0, 340);
-  atas.addColorStop(0, 'rgba(0,0,0,0.5)');
-  atas.addColorStop(1, 'rgba(0,0,0,0)');
-  c.fillStyle = atas;
-  c.fillRect(0, 0, W, 340);
-  const bawah = c.createLinearGradient(0, H - 660, 0, H);
-  bawah.addColorStop(0, 'rgba(0,0,0,0)');
-  bawah.addColorStop(1, 'rgba(0,0,0,0.7)');
-  c.fillStyle = bawah;
-  c.fillRect(0, H - 660, W, 660);
-
-  // Atas kiri: logo kecil
-  try {
-    const logo = await muatMarka();
-    const lw = 170, lh = lw * logo.height / logo.width;
-    c.globalAlpha = 0.9;
-    c.drawImage(logo, 56, 56, lw, lh);
-    c.globalAlpha = 1;
-  } catch (e) { /* logo tidak termuat: gambar tetap dibuat */ }
-
-  // Atas kanan: label BU dan HEMAT
-  const lencana = [];
-  if (adaBU(pr)) lencana.push({ teks: 'BU', latar: '#2E7D5B', warna: '#FFFFFF' });
-  const harga = pasanganHargaPromo(pr);
-  if (harga && harga.promo > 0 && harga.promo < harga.normal) {
-    lencana.push({ teks: 'HEMAT ' + hargaPromo(harga.normal - harga.promo), latar: '#F2B33D', warna: '#3A2400' });
-  }
-  let yl = 56;
-  lencana.forEach(function (l) {
-    c.font = '800 46px "Segoe UI", Roboto, Arial, sans-serif';
-    const w = c.measureText(l.teks).width + 56;
-    const xl = W - 56 - w;
-    c.fillStyle = l.latar;
-    garisBundar(c, xl, yl, w, 84, 42);
-    c.fill();
-    c.fillStyle = l.warna;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText(l.teks, xl + w / 2, yl + 43);
-    yl += 84 + 16;
-  });
-
-  // Bawah: nama, area, harga, spesifikasi, kaki
-  c.textAlign = 'center';
-  c.textBaseline = 'alphabetic';
-  c.fillStyle = '#FFFFFF';
-  // Bayangan halus di belakang tulisan bawah supaya tetap terbaca di foto yang terang.
-  c.save();
-  c.shadowColor = 'rgba(0,0,0,0.85)';
-  c.shadowBlur = 14;
-  c.shadowOffsetY = 2;
-  const y0 = H - 600;
-  tulisanMuat(c, pr.nama_properti || 'Properti', 66, '800', W - 120);
-  c.fillText(pr.nama_properti || 'Properti', W / 2, y0);
-  c.font = '600 40px "Segoe UI", Roboto, Arial, sans-serif';
-  c.fillText(areaPromo(pr), W / 2, y0 + 62);
-
-  let yHarga = y0 + 250;
-  if (pilih.harga && harga) {
-    const adaPromo = harga.promo > 0 && harga.promo < harga.normal;
-    if (adaPromo) {
-      const teksNormal = hargaPromo(harga.normal) + harga.akhiran;
-      c.font = '600 46px "Segoe UI", Roboto, Arial, sans-serif';
-      c.fillStyle = 'rgba(255,255,255,0.85)';
-      const lebarN = c.measureText(teksNormal).width;
-      c.fillText(teksNormal, W / 2, y0 + 130);
-      c.fillRect(W / 2 - lebarN / 2 - 8, y0 + 118, lebarN + 16, 5);   // garis coret
-      c.fillStyle = '#FFFFFF';
-      yHarga = y0 + 250;
-      tulisanMuat(c, hargaPromo(harga.promo) + harga.akhiran, 120, '800', W - 120);
-      c.fillText(hargaPromo(harga.promo) + harga.akhiran, W / 2, yHarga);
-    } else {
-      tulisanMuat(c, hargaPromo(harga.normal) + harga.akhiran, 120, '800', W - 120);
-      c.fillText(hargaPromo(harga.normal) + harga.akhiran, W / 2, yHarga);
-    }
-  }
-  if (pilih.spek) {
-    c.font = '600 38px "Segoe UI", Roboto, Arial, sans-serif';
-    spekPromo(pr).forEach(function (baris, i) {
-      tulisanMuat(c, baris, 38, '600', W - 120);
-      c.fillText(baris, W / 2, y0 + 340 + i * 52);
-    });
-  }
-  if (pilih.agen) {
-    const kaki = 'Hubungi ' + CONFIG.NAMA_BANNER + ' · ' + CONFIG.NO_HP_PEMILIK;
-    tulisanMuat(c, kaki, 46, '800', W - 120);
-    c.fillText(kaki, W / 2, H - 70);
-  }
-  c.restore();
-
-  const blob = await new Promise(function (ok, gagal) {
-    kanvas.toBlob(function (b) { if (b) ok(b); else gagal(new Error('toBlob')); }, 'image/jpeg', 0.92);
-  });
-  kanvas.width = 0;
-  kanvas.height = 0;
+  const blob = await new Promise(function (ok, gagal) { kanvas.toBlob(function (bl) { bl ? ok(bl) : gagal(new Error('kanvas')); }, 'image/jpeg', 0.9); });
+  kanvas.width = 0; kanvas.height = 0;
   return blob;
 }
 
@@ -1818,7 +1715,7 @@ function muatAset(nama) {
 }
 
 function gayaPromoAwal() {
-  try { return localStorage.getItem('gayaPromo') === 'banner' ? 'banner' : 'watermark'; } catch (e) { return 'watermark'; }
+  try { return localStorage.getItem('gayaPromo') === 'polos' ? 'polos' : 'banner'; } catch (e) { return 'banner'; }
 }
 
 /** Gaya "Banner Gading Pro": foto di atas, strip banner di bawah (harga, hubungi, QR WhatsApp). Hasil: Blob JPEG 1080 x 1350. */
@@ -2013,6 +1910,7 @@ function layarPromo(isi, p) {
   const tombolUnduh = tombol('tombol-kedua', 'unduh', 'Unduh gambar', unduh);
   const tandaHarga = kotakCentang('Tulisan harga', 'Harga normal dan harga promo', true, function (b) { pilih.harga = b; segarkan(); });
   const tandaSpek = kotakCentang('Tulisan spesifikasi', 'Luas, kamar, carport, listrik, menghadap', true, function (b) { pilih.spek = b; segarkan(); });
+  const wadahTulisan = el('div', { class: 'bidang jarak-atas' });
   const tandaAgen = kotakCentang('Nama dan HP agen', 'Hubungi ' + CONFIG.NAMA_BANNER + ' · ' + CONFIG.NO_HP_PEMILIK, true, function (b) { pilih.agen = b; segarkan(); });
 
   fotos.forEach(function (f) {
@@ -2027,14 +1925,14 @@ function layarPromo(isi, p) {
   });
 
   isi.append(
-    el('div', { class: 'bidang' }, el('span', { class: 'label', text: 'Foto yang diberi tulisan' }), el('span', { class: 'keterangan', text: 'Boleh lebih dari satu. Tiap foto jadi satu gambar.' })),
+    el('div', { class: 'bidang' }, el('span', { class: 'label', text: 'Pilih foto' }), el('span', { class: 'keterangan', text: 'Boleh lebih dari satu. Tiap foto jadi satu gambar.' })),
     fotos.length ? kisiFoto : el('p', { class: 'kecil redup', text: 'Belum ada foto properti. Tambahkan foto dulu.' }),
-    el('div', { class: 'jarak-atas' }, grupPilihan('Gaya gambar', '', [{ nilai: 'watermark', label: 'Watermark' }, { nilai: 'banner', label: 'Banner Gading Pro' }], pilih.gaya, function (g) {
+    el('div', { class: 'jarak-atas' }, grupPilihan('Gaya gambar', '', [{ nilai: 'banner', label: 'Banner Gading Pro' }, { nilai: 'polos', label: 'Polos (untuk agen lain)' }], pilih.gaya, function (g) {
       pilih.gaya = g;
       try { localStorage.setItem('gayaPromo', g); } catch (e) { /* tidak apa-apa */ }
       segarkan();
     }).wadah),
-    el('div', { class: 'bidang jarak-atas' }, el('span', { class: 'label', text: 'Tulisan yang tampil' }), tandaHarga, tandaSpek, tandaAgen),
+    wadahTulisan,
     catatan, wadahHasil,
     el('div', { class: 'tumpuk jarak-atas' }, tombolBagi, tombolUnduh));
 
@@ -2045,6 +1943,9 @@ function layarPromo(isi, p) {
 
   async function segarkan() {
     const ke = ++nomor;
+    // Polos: tidak ada tulisan di gambar, jadi pilihan tulisan disembunyikan.
+    wadahTulisan.hidden = pilih.gaya === 'polos';
+    if (!wadahTulisan.firstChild) wadahTulisan.append(el('span', { class: 'label', text: 'Tulisan yang tampil' }), tandaHarga, tandaSpek, tandaAgen);
     const terpilih = fotos.filter(function (f) { return dipilih[f.id_dokumen]; });
     tombolBagi.disabled = true;
     tombolUnduh.disabled = true;
@@ -2069,7 +1970,8 @@ function layarPromo(isi, p) {
       kosongkan(wadahHasil);
       hasil.forEach(function (h) { wadahHasil.append(el('img', { class: 'pratinjau-promo', alt: 'Pratinjau gambar promo', src: h.url })); });
       catatan.textContent = hasil.length + ' gambar, ukuran 4:5 (1080 × 1350).';
-      if (pilih.gaya === 'banner') {
+      if (pilih.gaya === 'polos') catatan.textContent += ' Tanpa tulisan, untuk dibagikan ke agen lain.';
+      {
         if (BANNER_INFO.gagal) catatan.textContent += ' Foto asli belum bisa dibuka' + (BANNER_INFO.pesan ? ' (' + BANNER_INFO.pesan + ')' : '') + ', jadi memakai foto ber-watermark. Pastikan server sudah versi terbaru.';
         else if (BANNER_INFO.lama) catatan.textContent += ' ' + BANNER_INFO.lama + ' foto belum punya versi asli (diunggah sebelum fitur ini), jadi masih ber-watermark. Unggah ulang fotonya agar bersih.';
       }
@@ -2098,7 +2000,7 @@ function layarPromo(isi, p) {
     sibuk(tombolBagi, true, 'Membuka menu...', 'Bagikan ke WhatsApp');
     try {
       // Gambar promo disebar ke calon pembeli, jadi tidak boleh menyapa pemilik propertinya.
-      await navigator.share({ files: files, text: teksPromosi([pr], null) });
+      await navigator.share({ files: files, text: pilih.gaya === 'polos' ? teksCobroke(pr) : teksPromosi([pr], null) });
     } catch (e) {
       if (!e || e.name !== 'AbortError') unduh();
     } finally {
@@ -6910,6 +6812,14 @@ function unduhBlob(url, nama) {
    ════════════════════════════════════════════════════════════ */
 
 function lepasBagikan() { /* foto besar tetap di memori sementara untuk dipakai lagi */ }
+
+/** 5.12: pesan untuk sesama agen (co-broke). Isi properti sama dengan pesan promo, tanpa data penjual dan komisi. */
+function teksCobroke(pr) {
+  const isi = teksPromosi([pr], null).split('\n');
+  isi[0] = 'Halo rekan agen, saya ' + CONFIG.IDENTITAS_WA + '. Ada listing berikut:';
+  isi[isi.length - 1] = 'Kalau ada pembeli yang cocok, kabari saya ya. Terima kasih.';
+  return isi.join('\n');
+}
 
 function teksPromosi(props, untuk) {
   const baris = [];
