@@ -1,7 +1,7 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
-   Versi 5.11 — 15 November 2026. Butuh Code.gs 3.1. Baru: kotak penampil foto tingginya tetap (tombol tidak naik-turun) dan geser foto lebih ringan (foto kecil tampil dulu, foto tajam hanya untuk yang sedang dilihat). Sebelumnya (5.10): dokumen PDF (SHM, PBB, dll.) bisa diunggah, diubah jadi gambar per halaman di HP. Butuh file pdfjs.js dan pdfjs.worker.js di GitHub. Sebelumnya (5.9): foto di rincian properti bisa digeser kiri-kanan. Sebelumnya (5.8): nama agen seragam jadi "Puji Tan" di seluruh aplikasi, sapaan umum jadi "Semangat pagi investor properti!", dan pesan ke agen lain memakai nama dan kantor lengkap. Sebelumnya (5.6): sapaan pesan WhatsApp diperbaiki (gambar promo tidak lagi menyapa penjual) dan foto dikecilkan ke 1280 px supaya unggah lebih ringan. Sebelumnya (5.5): peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
+   Versi 5.13 — 23 November 2026. Butuh Code.gs 3.1 (disarankan 3.4). Baru: gaya gambar jadi 3 (Banner, Watermark logo samar 25%, Polos) dan pilihan Kirim ke (Pembeli / Rekan agen) yang ikut gaya tapi bisa diganti, plus kotak Pesan yang ikut terkirim. Sebelumnya (5.12): gaya gambar promo jadi Banner Gading Pro dan Polos (untuk agen lain, tanpa tulisan, 4:5, pesan WA untuk rekan agen tanpa data penjual); Watermark lama dihapus. Sebelumnya (5.11): kotak penampil foto tingginya tetap (tombol tidak naik-turun) dan geser foto lebih ringan (foto kecil tampil dulu, foto tajam hanya untuk yang sedang dilihat). Sebelumnya (5.10): dokumen PDF (SHM, PBB, dll.) bisa diunggah, diubah jadi gambar per halaman di HP. Butuh file pdfjs.js dan pdfjs.worker.js di GitHub. Sebelumnya (5.9): foto di rincian properti bisa digeser kiri-kanan. Sebelumnya (5.8): nama agen seragam jadi "Puji Tan" di seluruh aplikasi, sapaan umum jadi "Semangat pagi investor properti!", dan pesan ke agen lain memakai nama dan kantor lengkap. Sebelumnya (5.6): sapaan pesan WhatsApp diperbaiki (gambar promo tidak lagi menyapa penjual) dan foto dikecilkan ke 1280 px supaya unggah lebih ringan. Sebelumnya (5.5): peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
    daftar panjang tampil bertahap saat digulir; Listing punya panjang x lebar, keterangan tambahan masuk ke catatan,
    umur listing; baris kecil di Beranda yang menunjukkan ukuran dan lama muat data.
    Versi 5.0 — 2 November 2026. Butuh Code.gs 2.5. Baru: menu Listing untuk info properti dari grup WhatsApp agen lain
@@ -1696,6 +1696,10 @@ async function buatGambarPromo(pr, idFoto, pilih) {
   img.src = x.url; await img.decode();
   const sk = Math.max(W / img.naturalWidth, H / img.naturalHeight), dw = img.naturalWidth * sk, dh = img.naturalHeight * sk;
   c.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  // 5.13: gaya Watermark: logo Gading Pro samar (25%), agak ke dalam dari pojok kanan bawah supaya tidak mudah dipotong.
+  if (pilih.gaya === 'watermark') {
+    try { const lg = await muatAset('logo-banner.png'); c.globalAlpha = 0.25; c.drawImage(lg, W - 430, H - 360, 260, 130); c.globalAlpha = 1; } catch (e) { /* logo tidak termuat: tetap dibuat */ }
+  }
   const blob = await new Promise(function (ok, gagal) { kanvas.toBlob(function (bl) { bl ? ok(bl) : gagal(new Error('kanvas')); }, 'image/jpeg', 0.9); });
   kanvas.width = 0; kanvas.height = 0;
   return blob;
@@ -1715,7 +1719,7 @@ function muatAset(nama) {
 }
 
 function gayaPromoAwal() {
-  try { return localStorage.getItem('gayaPromo') === 'polos' ? 'polos' : 'banner'; } catch (e) { return 'banner'; }
+  try { const g = localStorage.getItem('gayaPromo'); return g === 'polos' || g === 'watermark' ? g : 'banner'; } catch (e) { return 'banner'; }
 }
 
 /** Gaya "Banner Gading Pro": foto di atas, strip banner di bawah (harga, hubungi, QR WhatsApp). Hasil: Blob JPEG 1080 x 1350. */
@@ -1900,6 +1904,11 @@ function layarPromo(isi, p) {
   const dipilih = {};
   if (fotos[0]) dipilih[fotos[0].id_dokumen] = true;
   const pilih = { harga: true, spek: true, agen: true, gaya: gayaPromoAwal() };
+  pilih.ke = pilih.gaya === 'polos' ? 'rekan' : 'pembeli';   // 5.13: kirim ke siapa (ikut gaya, boleh diganti)
+  const kotakPesan = el('p', { class: 'kotak-pesan-wa' });
+  const isiPesan = function () { return pilih.ke === 'rekan' ? teksCobroke(pr) : teksPromosi([pr], null); };
+  const tampilPesan = function () { kotakPesan.textContent = isiPesan(); };
+  const grupKe = grupPilihan('2. Kirim ke', 'Ikut menyesuaikan gaya, boleh diganti sendiri', [{ nilai: 'pembeli', label: 'Pembeli' }, { nilai: 'rekan', label: 'Rekan agen' }], pilih.ke, function (v) { pilih.ke = v; tampilPesan(); });
   let hasil = [];          // { nama, blob, url }
   let nomor = 0;
 
@@ -1927,12 +1936,15 @@ function layarPromo(isi, p) {
   isi.append(
     el('div', { class: 'bidang' }, el('span', { class: 'label', text: 'Pilih foto' }), el('span', { class: 'keterangan', text: 'Boleh lebih dari satu. Tiap foto jadi satu gambar.' })),
     fotos.length ? kisiFoto : el('p', { class: 'kecil redup', text: 'Belum ada foto properti. Tambahkan foto dulu.' }),
-    el('div', { class: 'jarak-atas' }, grupPilihan('Gaya gambar', '', [{ nilai: 'banner', label: 'Banner Gading Pro' }, { nilai: 'polos', label: 'Polos (untuk agen lain)' }], pilih.gaya, function (g) {
+    el('div', { class: 'jarak-atas' }, grupPilihan('1. Gaya gambar', '', [{ nilai: 'banner', label: 'Banner' }, { nilai: 'watermark', label: 'Watermark' }, { nilai: 'polos', label: 'Polos' }], pilih.gaya, function (g) {
       pilih.gaya = g;
+      pilih.ke = g === 'polos' ? 'rekan' : 'pembeli'; grupKe.atur(pilih.ke); tampilPesan();
       try { localStorage.setItem('gayaPromo', g); } catch (e) { /* tidak apa-apa */ }
       segarkan();
-    }).wadah),
+    }, false, 'baris-3').wadah),
+    grupKe.wadah,
     wadahTulisan,
+    el('div', { class: 'bidang' }, el('span', { class: 'label', text: 'Pesan yang ikut terkirim' }), kotakPesan),
     catatan, wadahHasil,
     el('div', { class: 'tumpuk jarak-atas' }, tombolBagi, tombolUnduh));
 
@@ -1944,7 +1956,8 @@ function layarPromo(isi, p) {
   async function segarkan() {
     const ke = ++nomor;
     // Polos: tidak ada tulisan di gambar, jadi pilihan tulisan disembunyikan.
-    wadahTulisan.hidden = pilih.gaya === 'polos';
+    wadahTulisan.hidden = pilih.gaya !== 'banner';
+    tampilPesan();
     if (!wadahTulisan.firstChild) wadahTulisan.append(el('span', { class: 'label', text: 'Tulisan yang tampil' }), tandaHarga, tandaSpek, tandaAgen);
     const terpilih = fotos.filter(function (f) { return dipilih[f.id_dokumen]; });
     tombolBagi.disabled = true;
@@ -1970,7 +1983,8 @@ function layarPromo(isi, p) {
       kosongkan(wadahHasil);
       hasil.forEach(function (h) { wadahHasil.append(el('img', { class: 'pratinjau-promo', alt: 'Pratinjau gambar promo', src: h.url })); });
       catatan.textContent = hasil.length + ' gambar, ukuran 4:5 (1080 × 1350).';
-      if (pilih.gaya === 'polos') catatan.textContent += ' Tanpa tulisan, untuk dibagikan ke agen lain.';
+      if (pilih.gaya === 'polos') catatan.textContent += ' Tanpa tulisan dan logo.';
+      if (pilih.gaya === 'watermark') catatan.textContent += ' Logo Gading Pro samar, tanpa tulisan.';
       {
         if (BANNER_INFO.gagal) catatan.textContent += ' Foto asli belum bisa dibuka' + (BANNER_INFO.pesan ? ' (' + BANNER_INFO.pesan + ')' : '') + ', jadi memakai foto ber-watermark. Pastikan server sudah versi terbaru.';
         else if (BANNER_INFO.lama) catatan.textContent += ' ' + BANNER_INFO.lama + ' foto belum punya versi asli (diunggah sebelum fitur ini), jadi masih ber-watermark. Unggah ulang fotonya agar bersih.';
@@ -2000,7 +2014,7 @@ function layarPromo(isi, p) {
     sibuk(tombolBagi, true, 'Membuka menu...', 'Bagikan ke WhatsApp');
     try {
       // Gambar promo disebar ke calon pembeli, jadi tidak boleh menyapa pemilik propertinya.
-      await navigator.share({ files: files, text: pilih.gaya === 'polos' ? teksCobroke(pr) : teksPromosi([pr], null) });
+      await navigator.share({ files: files, text: isiPesan() });
     } catch (e) {
       if (!e || e.name !== 'AbortError') unduh();
     } finally {
@@ -6817,7 +6831,7 @@ function lepasBagikan() { /* foto besar tetap di memori sementara untuk dipakai 
 function teksCobroke(pr) {
   const isi = teksPromosi([pr], null).split('\n');
   isi[0] = 'Halo rekan agen, saya ' + CONFIG.IDENTITAS_WA + '. Ada listing berikut:';
-  isi[isi.length - 1] = 'Kalau ada pembeli yang cocok, kabari saya ya. Terima kasih.';
+  isi[isi.length - 1] = 'Kalau ada pembeli yang cocok, tolong kabari saya ya. Terima kasih.';
   return isi.join('\n');
 }
 

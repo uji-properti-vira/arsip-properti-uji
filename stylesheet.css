@@ -1225,3 +1225,5 @@ body.layar-masuk .isi { max-width: none; padding: 0; }
 .geser-slide { position: relative; }
 .geser-slide.ada-foto > .ikon { display: none; }
 .geser-slide img.penuh { position: absolute; inset: 0; }
+/* 5.13: pratinjau pesan WhatsApp di layar Gambar Promo */
+.kotak-pesan-wa { margin: 6px 0 0; padding: 12px 14px; border-radius: 12px; background: #DCF8C6; color: #1F2A24; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
