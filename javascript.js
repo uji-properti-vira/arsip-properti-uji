@@ -1,7 +1,7 @@
 /* VERSI UJI — akun virakhususgame@gmail.com */
 /* ============================================================
    ARSIP PROPERTI — Logika tampilan (javascript.js)
-   Versi 5.13 — 23 November 2026. Butuh Code.gs 3.1 (disarankan 3.4). Baru: gaya gambar jadi 3 (Banner, Watermark logo samar 25%, Polos) dan pilihan Kirim ke (Pembeli / Rekan agen) yang ikut gaya tapi bisa diganti, plus kotak Pesan yang ikut terkirim. Sebelumnya (5.12): gaya gambar promo jadi Banner Gading Pro dan Polos (untuk agen lain, tanpa tulisan, 4:5, pesan WA untuk rekan agen tanpa data penjual); Watermark lama dihapus. Sebelumnya (5.11): kotak penampil foto tingginya tetap (tombol tidak naik-turun) dan geser foto lebih ringan (foto kecil tampil dulu, foto tajam hanya untuk yang sedang dilihat). Sebelumnya (5.10): dokumen PDF (SHM, PBB, dll.) bisa diunggah, diubah jadi gambar per halaman di HP. Butuh file pdfjs.js dan pdfjs.worker.js di GitHub. Sebelumnya (5.9): foto di rincian properti bisa digeser kiri-kanan. Sebelumnya (5.8): nama agen seragam jadi "Puji Tan" di seluruh aplikasi, sapaan umum jadi "Semangat pagi investor properti!", dan pesan ke agen lain memakai nama dan kantor lengkap. Sebelumnya (5.6): sapaan pesan WhatsApp diperbaiki (gambar promo tidak lagi menyapa penjual) dan foto dikecilkan ke 1280 px supaya unggah lebih ringan. Sebelumnya (5.5): peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
+   Versi 5.15 — 24 November 2026. Butuh Code.gs 3.5. Baru: nomor HP Puji Tan di penutup pesan WA (ke pembeli dan ke rekan agen). Sebelumnya (5.14): isian Perabot (Furnished / Semi furnished / Unfurnished) di properti dan di kebutuhan pembeli; ikut di detail, pesan WA, banner; pencocokan tidak kaku (beda perabot tetap muncul, diberi keterangan). Sebelumnya (5.13): gaya gambar jadi 3 (Banner, Watermark logo samar 25%, Polos) dan pilihan Kirim ke (Pembeli / Rekan agen) yang ikut gaya tapi bisa diganti, plus kotak Pesan yang ikut terkirim. Sebelumnya (5.12): gaya gambar promo jadi Banner Gading Pro dan Polos (untuk agen lain, tanpa tulisan, 4:5, pesan WA untuk rekan agen tanpa data penjual); Watermark lama dihapus. Sebelumnya (5.11): kotak penampil foto tingginya tetap (tombol tidak naik-turun) dan geser foto lebih ringan (foto kecil tampil dulu, foto tajam hanya untuk yang sedang dilihat). Sebelumnya (5.10): dokumen PDF (SHM, PBB, dll.) bisa diunggah, diubah jadi gambar per halaman di HP. Butuh file pdfjs.js dan pdfjs.worker.js di GitHub. Sebelumnya (5.9): foto di rincian properti bisa digeser kiri-kanan. Sebelumnya (5.8): nama agen seragam jadi "Puji Tan" di seluruh aplikasi, sapaan umum jadi "Semangat pagi investor properti!", dan pesan ke agen lain memakai nama dan kantor lengkap. Sebelumnya (5.6): sapaan pesan WhatsApp diperbaiki (gambar promo tidak lagi menyapa penjual) dan foto dikecilkan ke 1280 px supaya unggah lebih ringan. Sebelumnya (5.5): peringatan listing kembar saat menempel dari WhatsApp (tampil di layar yang sama, tanpa pindah halaman). Sebelumnya (5.4): komisi jual dan sewa dipisah di Listing dan di properti klien; foto properti tidak lagi diberi watermark; kolom Kota menerima nama kecamatan; watermark KTP/NPWP/Sertifikat jadi satu baris tulisan besar tanpa nama. Sebelumnya (5.3): gambar promo agen di menu Listing (maks 3, tanpa watermark) dan gaya gambar "Banner Gading Pro" di layar promo. Sebelumnya (5.1): data lama (arsip) tetap muncul di pencarian dengan label Arsip;
    daftar panjang tampil bertahap saat digulir; Listing punya panjang x lebar, keterangan tambahan masuk ke catatan,
    umur listing; baris kecil di Beranda yang menunjukkan ukuran dan lama muat data.
    Versi 5.0 — 2 November 2026. Butuh Code.gs 2.5. Baru: menu Listing untuk info properti dari grup WhatsApp agen lain
@@ -114,6 +114,7 @@ const JENIS_PROP = ['Rumah', 'Tanah', 'Ruko', 'Lainnya'];
 const ARAH_HADAP = ['Utara', 'Timur Laut', 'Timur', 'Tenggara', 'Selatan', 'Barat Daya', 'Barat', 'Barat Laut'];
 const LISTRIK_VA = ['900', '1300', '2200', '3500', '4400', '5500'];
 const KONDISI = ['Baru', 'Second'];
+const PERABOT = ['Furnished', 'Semi furnished', 'Unfurnished'];   // 5.14
 const SERTIFIKAT = ['SHM', 'HGB', 'AJB', 'Girik', 'Lainnya'];
 const PROGRES_PROP = ['Tersedia', 'Negosiasi', 'Deal', 'Sold', 'Batal', 'Agen lain'];
 const STATUS_BELI = ['Mencari', 'Sudah dapat', 'Tidak lanjut'];
@@ -1169,12 +1170,12 @@ function kelengkapan(pr) {
 
 /** Hal yang dicari pembeli, untuk ditampilkan: "Beli · Second · Rumah · Depok · s/d Rp 1,5 M". */
 function kebutuhanTeks(k) {
-  return [k.kebutuhan_cara, k.kebutuhan_kondisi, k.kebutuhan_jenis ? namaJenis(k.kebutuhan_jenis) : '', k.kebutuhan_area,
+  return [k.kebutuhan_cara, k.kebutuhan_kondisi, k.kebutuhan_perabot, k.kebutuhan_jenis ? namaJenis(k.kebutuhan_jenis) : '', k.kebutuhan_area,
     k.budget ? 's/d ' + rupiahPendek(k.budget) + (k.kebutuhan_cara === 'Sewa' ? '/thn' : '') : ''].filter(Boolean).join(' · ');
 }
 
 function punyaKebutuhan(k) {
-  return !!(k.kebutuhan_cara || k.kebutuhan_kondisi || k.kebutuhan_jenis || k.kebutuhan_area || k.budget);
+  return !!(k.kebutuhan_cara || k.kebutuhan_kondisi || k.kebutuhan_perabot || k.kebutuhan_jenis || k.kebutuhan_area || k.budget);
 }
 
 /**
@@ -1204,7 +1205,9 @@ function nilaiCocok(k, pr) {
       meleset.push('Lebih mahal ' + rupiahPendek(harga - budget) + (sewa ? '/thn' : '') + ' dari budget');
     }
   }
-  return { meleset: meleset, lebih: lebih, jauh: lebih > CONFIG.BATAS_BUDGET_HAMPIR };
+  // 5.14: perabot tidak menggugurkan (tidak dihitung meleset). Bila beda, hanya diberi keterangan.
+  const perabot = k.kebutuhan_perabot && pr.perabot && pr.perabot !== k.kebutuhan_perabot ? 'Perabot: ' + pr.perabot : '';
+  return { meleset: meleset, lebih: lebih, jauh: lebih > CONFIG.BATAS_BUDGET_HAMPIR, perabot: perabot };
 }
 
 /** Golongan hasil nilaiCocok: 'cocok', 'hampir' (meleset satu hal), 'alt' (hanya harga 30-60% di atas budget). */
@@ -1216,14 +1219,14 @@ function golongan(n) {
 
 /** Untuk satu pembeli: properti yang cocok semua, hampir cocok, dan alternatif (agak di atas budget). */
 function propertiCocok(k) {
-  const hasil = { cocok: [], hampir: [], alt: [] };
+  const hasil = { cocok: [], hampir: [], alt: [], perabot: {} };
   if (!punyaKebutuhan(k)) return hasil;
   S.data.properti.forEach(function (pr) {
     const n = nilaiCocok(k, pr);
     if (!n) return;
     const g = golongan(n);
-    if (g === 'cocok') hasil.cocok.push(pr);
-    else if (g) hasil[g].push({ pr: pr, alasan: n.meleset[0], lebih: n.lebih });
+    if (g === 'cocok') { hasil.cocok.push(pr); if (n.perabot) hasil.perabot[pr.id_properti] = n.perabot; }
+    else if (g) hasil[g].push({ pr: pr, alasan: [n.meleset[0], n.perabot].filter(Boolean).join(' · '), lebih: n.lebih });
   });
   hasil.cocok.sort(function (a, b) { return urutNama(a, b, 'nama_properti'); });
   const dekat = function (a, b) { return a.lebih - b.lebih; };
@@ -1234,14 +1237,14 @@ function propertiCocok(k) {
 
 /** Untuk satu properti: pembeli yang sedang mencari dan cocok. */
 function pembeliCocok(pr) {
-  const hasil = { cocok: [], hampir: [], alt: [] };
+  const hasil = { cocok: [], hampir: [], alt: [], perabot: {} };
   S.data.klien.forEach(function (k) {
     if (k.peran !== 'Pembeli' || (k.status_beli || 'Mencari') !== 'Mencari' || !punyaKebutuhan(k)) return;
     const n = nilaiCocok(k, pr);
     if (!n) return;
     const g = golongan(n);
-    if (g === 'cocok') hasil.cocok.push(k);
-    else if (g) hasil[g].push({ k: k, alasan: n.meleset[0], lebih: n.lebih });
+    if (g === 'cocok') { hasil.cocok.push(k); if (n.perabot) hasil.perabot[k.id_klien] = n.perabot; }
+    else if (g) hasil[g].push({ k: k, alasan: [n.meleset[0], n.perabot].filter(Boolean).join(' · '), lebih: n.lebih });
   });
   hasil.cocok.sort(function (a, b) { return urutNama(a, b, 'nama'); });
   const dekat = function (a, b) { return a.lebih - b.lebih; };
@@ -1342,14 +1345,14 @@ function terimaData(d) {
     return daftar;
   };
   d.klien = isiSkema(d.klien, sk.klien).map(function (k) {
-    return Object.assign({ kebutuhan_cara: '', kebutuhan_kondisi: '', budget: '', status_beli: k.peran === 'Pembeli' ? 'Mencari' : '', hubungi_tanggal: '', hubungi_catatan: '' }, k);
+    return Object.assign({ kebutuhan_cara: '', kebutuhan_kondisi: '', kebutuhan_perabot: '', budget: '', status_beli: k.peran === 'Pembeli' ? 'Mencari' : '', hubungi_tanggal: '', hubungi_catatan: '' }, k);
   });
   d.properti = isiSkema(d.properti, sk.properti).map(function (p) {
     const lama = !('dijual' in p);
     const t = lama ? tawaranDariLama(p.penawaran) : {};
     return Object.assign({ kondisi: '', dijual: false, disewakan: false, harga_jual: '', harga_sewa: '', satuan_sewa: '', luas_tanah: '', luas_bangunan: '',
       kamar_tidur: '', kamar_mandi: '', sertifikat: '', komisi_jenis: '', komisi_nilai: '',
-      komisi_jenis_sewa: '', komisi_nilai_sewa: '', tanggal_sold: '' }, p, t);
+      komisi_jenis_sewa: '', komisi_nilai_sewa: '', tanggal_sold: '', perabot: '' }, p, t);
   });
   d.dokumen = isiSkema(d.dokumen, sk.dokumen);
   d.listing = isiSkema(d.listing, sk.listing);
@@ -1665,7 +1668,8 @@ function spekPromo(pr) {
   const b = [
     carportTeks(pr) ? 'Carport ' + carportTeks(pr).toLowerCase() : '',
     pr.listrik_va ? 'Listrik ' + formatRibuan(pr.listrik_va) + ' watt' : '',
-    pr.menghadap ? 'Menghadap ' + pr.menghadap : ''
+    pr.menghadap ? 'Menghadap ' + pr.menghadap : '',
+    pr.perabot || ''
   ].filter(Boolean).join(' · ');
   return [a, b].filter(Boolean);
 }
@@ -3279,7 +3283,9 @@ function kartuCocokPembeli(k) {
     el('p', { class: 'kecil redup', text: (k.status_beli && k.status_beli !== 'Mencari' ? 'Status: ' + k.status_beli + '. ' : '') + 'Dari properti penjual yang masih dipasarkan.' }));
   if (h.cocok.length) {
     tambahAnak(kotak, [el('div', { class: 'daftar' }, h.cocok.map(function (pr) {
-      return barisProperti(pr, function () { buka('properti', { id: pr.id_properti }); }, true);
+      const b = barisProperti(pr, function () { buka('properti', { id: pr.id_properti }); }, true);
+      if (h.perabot[pr.id_properti]) b.querySelector('.tengah').append(el('span', { class: 'sub teks-aksen tebal', text: h.perabot[pr.id_properti] }));
+      return b;
     })),
     el('div', { class: 'jarak-atas-kecil' }, tombol('tombol-wa', ikonWa('putih'), 'Kirim ke WhatsApp', function () {
       buka('bagikan', { ids: h.cocok.slice(0, 5).map(function (x) { return x.id_properti; }), untuk: k.id_klien });
@@ -3398,6 +3404,7 @@ function layarProperti(isi, p) {
     pr.listrik_va ? infoBaris('perangkat', 'Listrik', formatRibuan(pr.listrik_va) + ' watt') : null,
     pr.sumber_air ? infoBaris('info', 'Air', pr.sumber_air) : null,
     pr.menghadap ? infoBaris('pin', 'Menghadap', pr.menghadap) : null,
+    pr.perabot ? infoBaris('gedung', 'Perabot', pr.perabot) : null,
     pr.sertifikat ? infoBaris('dokumen', 'Sertifikat', namaJenis(pr.sertifikat)) : null,
     pr.area ? infoBaris('pin', 'Area', pr.area) : null,
     komisiTeks(pr) ? infoBaris('perisai', 'Komisi (hanya untuk agen)', komisiTeks(pr)) : null,
@@ -3424,7 +3431,7 @@ function layarProperti(isi, p) {
       };
       isi.append(el('section', { class: 'kartu kartu-hijau kartu-cocok jarak-atas' },
         el('h2', { class: 'judul-kartu' }, ikon('cocok'), h.cocok.length ? h.cocok.length + ' pembeli sedang mencari properti seperti ini' : 'Pembeli yang hampir cocok'),
-        h.cocok.length ? el('div', { class: 'daftar' }, h.cocok.map(function (x) { return baris(x, ''); })) : null,
+        h.cocok.length ? el('div', { class: 'daftar' }, h.cocok.map(function (x) { return baris(x, h.perabot[x.id_klien] || ''); })) : null,
         h.hampir.length ? el('h3', { class: 'judul-kecil', text: 'Hampir cocok (' + h.hampir.length + ')' }) : null,
         h.hampir.length ? el('div', { class: 'daftar' }, h.hampir.map(function (x) { return baris(x.k, x.alasan); })) : null,
         h.alt.length ? el('h3', { class: 'judul-kecil', text: 'Alternatif, budget agak di bawah harga (' + h.alt.length + ')' }) : null,
@@ -6124,6 +6131,7 @@ function layarFormKlien(isi, p) {
     budget.wadah.querySelector('.label span').textContent = v === 'Sewa' ? 'Budget sewa per tahun' : 'Budget sampai';
   }, true);
   const beliKondisi = grupPilihan('Kondisi', 'Boleh kosong', KONDISI, ubah ? (k.kebutuhan_kondisi || null) : null, null, true);
+  const beliPerabot = grupPilihan('Perabot', 'Boleh kosong. Yang beda tetap ditawarkan', PERABOT, ubah ? (k.kebutuhan_perabot || null) : null, null, true, 'baris-3');
   const beliAwal = ubah ? (k.kebutuhan_jenis || '') : '';
   const beliLain = /^Lainnya: ?/.test(beliAwal);
   const beliJenisLain = bidangTeks('fBeliLain', 'Bangunan lainnya', 'Wajib diketik', beliLain ? beliAwal.replace(/^Lainnya: ?/, '') : '', { autocomplete: 'off', maxlength: '40', placeholder: 'Contoh: Gudang, Apartemen, Kos' });
@@ -6139,7 +6147,7 @@ function layarFormKlien(isi, p) {
   const statusBeli = ubah ? grupPilihan('Status pembeli', '', STATUS_BELI, k.status_beli || 'Mencari', null, false, 'baris-3') : null;
   tambahAnak(kebutuhanKotak, [el('h2', { class: 'judul-kartu', text: 'Yang dicari pembeli' }),
     el('p', { class: 'kecil redup', text: 'Dipakai untuk mencocokkan otomatis dengan properti penjual.' }),
-    beliCara.wadah, beliKondisi.wadah, beliJenis.wadah, beliJenisLain.wadah, beliArea.wadah, budget.wadah,
+    beliCara.wadah, beliKondisi.wadah, beliPerabot.wadah, beliJenis.wadah, beliJenisLain.wadah, beliArea.wadah, budget.wadah,
     statusBeli ? statusBeli.wadah : null]);
   kebutuhanKotak.classList.toggle('tersembunyi', !((ubah ? k.peran : p.peran) === 'Pembeli'));
 
@@ -6231,7 +6239,7 @@ function layarFormKlien(isi, p) {
         mode: ubah ? 'ubah' : 'baru', id_klien: idKlien, peran: peran.nilai(),
         nama: nilaiNama, no_hp: nilaiHp, catatan: rapiKalimat_(cat.isian.value),
         kebutuhan_jenis: nilaiBeliJenis, kebutuhan_area: pembeli ? beliArea.nilai() : '',
-        kebutuhan_cara: pembeli ? (beliCara.nilai() || '') : '', kebutuhan_kondisi: pembeli ? (beliKondisi.nilai() || '') : '',
+        kebutuhan_cara: pembeli ? (beliCara.nilai() || '') : '', kebutuhan_kondisi: pembeli ? (beliKondisi.nilai() || '') : '', kebutuhan_perabot: pembeli ? (beliPerabot.nilai() || '') : '',
         budget: pembeli ? budget.nilai() : '',
         tanggal_lahir: tglLahir.value || '', hubungi_tanggal: tglIngat.value || '', hubungi_catatan: tglIngat.value ? rapiKalimat_(catIngat.isian.value) : ''
       };
@@ -6514,6 +6522,7 @@ function layarFormProperti(isi, p) {
   const air = grupCentang('Sumber air', 'Boleh dua-duanya', [{ nilai: 'pdam', label: 'PDAM' }, { nilai: 'sumur', label: 'Sumur' }],
     { pdam: /PDAM/.test(airAwal), sumur: /Sumur/.test(airAwal) }, null);
   const arah = grupPilihan('Menghadap ke', 'Boleh kosong', ARAH_HADAP, ubah ? (pr.menghadap || null) : null, null, true);
+  const perabot = grupPilihan('Perabot', 'Boleh kosong', PERABOT, ubah ? (pr.perabot || null) : null, null, true, 'baris-3');
   const ringkasDetail = ubah ? [ukuranTeks(pr), komisiTeks(pr) ? 'komisi ' + komisiTeks(pr) : ''].filter(Boolean).join(' · ') : '';
   const lipat = el('details', { class: 'lipat' },
     el('summary', {}, ikon('penggaris'), el('span', { class: 'tengah' },
@@ -6528,6 +6537,7 @@ function layarFormProperti(isi, p) {
       el('div', {}, listrik.wadah, listrikKetik.wadah),
       air.wadah,
       arah.wadah,
+      perabot.wadah,
       sertifikat.wadah, sertLain.wadah,
       el('div', { class: 'kotak-komisi' }, komisiJenis.wadah, komisiPersen.wadah, komisiRp.wadah,
         komisiJenisSewa.wadah, komisiPersenSewa.wadah, komisiRpSewa.wadah,
@@ -6590,7 +6600,7 @@ function layarFormProperti(isi, p) {
         luas_tanah: lt.nilai(), luas_bangunan: lb.nilai(), kamar_tidur: kt.nilai(), kamar_mandi: km.nilai(),
         panjang_tanah: pjg.nilai(), lebar_tanah: lbr.nilai(), carport: carport.nilai() || '',
         listrik_va: listrik.nilai() === 'lain' ? listrikKetik.nilai() : (listrik.nilai() || ''),
-        sumber_air: airDariPilihan(air.nilai()), menghadap: arah.nilai() || '',
+        sumber_air: airDariPilihan(air.nilai()), menghadap: arah.nilai() || '', perabot: perabot.nilai() || '',
         bu: buTanda.getAttribute('aria-checked') === 'true' ? 'ya' : '',
         harga_jual_promo: t.dijual ? promoJual.nilai() : '', harga_sewa_promo: t.disewakan ? promoSewa.nilai() : '',
         sertifikat: sertifikat.nilai() === 'Lainnya' ? 'Lainnya: ' + teksSert : (sertifikat.nilai() || ''),
@@ -6832,6 +6842,7 @@ function teksCobroke(pr) {
   const isi = teksPromosi([pr], null).split('\n');
   isi[0] = 'Halo rekan agen, saya ' + CONFIG.IDENTITAS_WA + '. Ada listing berikut:';
   isi[isi.length - 1] = 'Kalau ada pembeli yang cocok, tolong kabari saya ya. Terima kasih.';
+  isi.push(CONFIG.IDENTITAS_WA + ' - ' + CONFIG.NO_HP_PEMILIK);   // 5.15
   return isi.join('\n');
 }
 
@@ -6867,11 +6878,12 @@ function teksPromosi(props, untuk) {
     if (pr.listrik_va) baris.push('Listrik ' + formatRibuan(pr.listrik_va) + ' watt');
     if (pr.sumber_air) baris.push('Air ' + pr.sumber_air);
     if (pr.menghadap) baris.push('Menghadap ' + pr.menghadap);
+    if (pr.perabot) baris.push(pr.perabot);
     if (adaBU(pr)) baris.push('BU (penjual butuh uang)');
     if (pr.sertifikat) baris.push('Sertifikat ' + namaJenis(pr.sertifikat));
     baris.push('');
   });
-  baris.push('Info dan jadwal survei hubungi ' + CONFIG.NAMA_PEMILIK + '.');
+  baris.push('Info dan jadwal survei hubungi ' + CONFIG.IDENTITAS_WA + ' - ' + CONFIG.NO_HP_PEMILIK + '.');   // 5.15: + nomor HP
   return baris.join('\n');
 }
 
