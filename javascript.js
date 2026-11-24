@@ -6131,7 +6131,7 @@ function layarFormKlien(isi, p) {
     budget.wadah.querySelector('.label span').textContent = v === 'Sewa' ? 'Budget sewa per tahun' : 'Budget sampai';
   }, true);
   const beliKondisi = grupPilihan('Kondisi', 'Boleh kosong', KONDISI, ubah ? (k.kebutuhan_kondisi || null) : null, null, true);
-  const beliPerabot = grupPilihan('Perabot', 'Boleh kosong. Yang beda tetap ditawarkan', PERABOT, ubah ? (k.kebutuhan_perabot || null) : null, null, true, 'baris-3');
+  const beliPerabot = grupPilihan('Perabot', 'Boleh kosong. Yang beda tetap ditawarkan', PERABOT, ubah ? (k.kebutuhan_perabot || null) : null, null, true);
   const beliAwal = ubah ? (k.kebutuhan_jenis || '') : '';
   const beliLain = /^Lainnya: ?/.test(beliAwal);
   const beliJenisLain = bidangTeks('fBeliLain', 'Bangunan lainnya', 'Wajib diketik', beliLain ? beliAwal.replace(/^Lainnya: ?/, '') : '', { autocomplete: 'off', maxlength: '40', placeholder: 'Contoh: Gudang, Apartemen, Kos' });
@@ -6522,7 +6522,7 @@ function layarFormProperti(isi, p) {
   const air = grupCentang('Sumber air', 'Boleh dua-duanya', [{ nilai: 'pdam', label: 'PDAM' }, { nilai: 'sumur', label: 'Sumur' }],
     { pdam: /PDAM/.test(airAwal), sumur: /Sumur/.test(airAwal) }, null);
   const arah = grupPilihan('Menghadap ke', 'Boleh kosong', ARAH_HADAP, ubah ? (pr.menghadap || null) : null, null, true);
-  const perabot = grupPilihan('Perabot', 'Boleh kosong', PERABOT, ubah ? (pr.perabot || null) : null, null, true, 'baris-3');
+  const perabot = grupPilihan('Perabot', 'Boleh kosong', PERABOT, ubah ? (pr.perabot || null) : null, null, true);   // 2 kolom: tulisan panjang tidak luber
   const ringkasDetail = ubah ? [ukuranTeks(pr), komisiTeks(pr) ? 'komisi ' + komisiTeks(pr) : ''].filter(Boolean).join(' · ') : '';
   const lipat = el('details', { class: 'lipat' },
     el('summary', {}, ikon('penggaris'), el('span', { class: 'tengah' },
@@ -6841,8 +6841,8 @@ function lepasBagikan() { /* foto besar tetap di memori sementara untuk dipakai 
 function teksCobroke(pr) {
   const isi = teksPromosi([pr], null).split('\n');
   isi[0] = 'Halo rekan agen, saya ' + CONFIG.IDENTITAS_WA + '. Ada listing berikut:';
-  isi[isi.length - 1] = 'Kalau ada pembeli yang cocok, tolong kabari saya ya. Terima kasih.';
-  isi.push(CONFIG.IDENTITAS_WA + ' - ' + CONFIG.NO_HP_PEMILIK);   // 5.15
+  isi.splice(isi.length - 3, 3, 'Kalau ada pembeli yang cocok, tolong kabari saya ya. Terima kasih.');   // 3 baris penutup pembeli diganti
+  isi.push(CONFIG.IDENTITAS_WA, CONFIG.NO_HP_PEMILIK);   // 5.15
   return isi.join('\n');
 }
 
@@ -6883,7 +6883,7 @@ function teksPromosi(props, untuk) {
     if (pr.sertifikat) baris.push('Sertifikat ' + namaJenis(pr.sertifikat));
     baris.push('');
   });
-  baris.push('Info dan jadwal survei hubungi ' + CONFIG.IDENTITAS_WA + ' - ' + CONFIG.NO_HP_PEMILIK + '.');   // 5.15: + nomor HP
+  baris.push('Info dan jadwal survei hubungi\n' + CONFIG.IDENTITAS_WA + '\n' + CONFIG.NO_HP_PEMILIK);   // 5.15: + nomor HP
   return baris.join('\n');
 }
 
